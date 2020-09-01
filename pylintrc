@@ -17,7 +17,7 @@ files-output=no
 bad-functions = input
 
 [TYPECHECK]
-generated-members=.*\.hook\.get_samples
+generated-members=zmq.*
 
 [DESIGN]
 max-line-length     = 200

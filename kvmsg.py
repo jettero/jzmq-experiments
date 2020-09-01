@@ -6,12 +6,14 @@ Author: Min RK <benjaminrk@gmail.com>
 
 """
 
-import struct # for packing integers
+import struct  # for packing integers
 import sys
 from uuid import uuid4
 
 import zmq
+
 # zmq.jsonapi ensures bytes, instead of unicode:
+
 
 def encode_properties(properties_dict):
     prop_s = b""
@@ -29,10 +31,11 @@ def decode_properties(prop_s):
             key, value = line.split(b"=")
             prop[key] = value
         except ValueError as e:
-            #Catch empty line
+            # Catch empty line
             pass
 
     return prop
+
 
 class KVMsg(object):
     """
@@ -43,9 +46,10 @@ class KVMsg(object):
     frame 3: properties (0MQ string)
     frame 4: body (blob)
     """
+
     key = None
     sequence = 0
-    uuid=None
+    uuid = None
     properties = None
     body = None
 
@@ -79,11 +83,11 @@ class KVMsg(object):
 
     def send(self, socket):
         """Send key-value message to socket; any empty frames are sent as such."""
-        key = b'' if self.key is None else self.key
-        seq_s = struct.pack('!q', self.sequence)
-        body = b'' if self.body is None else self.body
+        key = b"" if self.key is None else self.key
+        seq_s = struct.pack("!q", self.sequence)
+        body = b"" if self.body is None else self.body
         prop_s = encode_properties(self.properties)
-        socket.send_multipart([ key, seq_s, self.uuid, prop_s, body ])
+        socket.send_multipart([key, seq_s, self.uuid, prop_s, body])
 
     @classmethod
     def recv(cls, socket):
@@ -95,20 +99,20 @@ class KVMsg(object):
         """Construct key-value message from a multipart message"""
         key, seq_s, uuid, prop_s, body = msg
         key = key if key else None
-        seq = struct.unpack('!q',seq_s)[0]
+        seq = struct.unpack("!q", seq_s)[0]
         body = body if body else None
         prop = decode_properties(prop_s)
         return cls(seq, uuid=uuid, key=key, properties=prop, body=body)
 
     def __repr__(self):
         if self.body is None:
-            return '<n/a>'
+            return "<n/a>"
         return self.body.decode()
 
     def __pfft_repr__(self):
         if self.body is None:
             size = 0
-            data=b'NULL'
+            data = b"NULL"
         else:
             size = len(self.body)
             data = repr(self.body)
@@ -123,14 +127,16 @@ class KVMsg(object):
         )
         return mstr
 
-
     def dump(self):
         print("<<", str(self), ">>", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------
 # Runs self test of class
 
-def test_kvmsg (verbose):
-    print(" * kvmsg: ", end='')
+
+def test_kvmsg(verbose):
+    print(" * kvmsg: ", end="")
 
     # Prepare our context and sockets
     ctx = zmq.Context()
@@ -155,7 +161,7 @@ def test_kvmsg (verbose):
     assert kvmsg2.key == b"key"
     kvmsg2.store(kvmap)
 
-    assert len(kvmap) == 1 # shouldn't be different
+    assert len(kvmap) == 1  # shouldn't be different
 
     # test send/recv with properties:
     kvmsg = KVMsg(2, key=b"key", body=b"body")
@@ -177,5 +183,6 @@ def test_kvmsg (verbose):
 
     print("OK")
 
-if __name__ == '__main__':
-    test_kvmsg('-v' in sys.argv)
+
+if __name__ == "__main__":
+    test_kvmsg("-v" in sys.argv)

@@ -11,6 +11,7 @@ import time
 import zmq
 from kvmsg import KVMsg
 
+
 def main():
 
     # Prepare our context and subscriber

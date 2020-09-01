@@ -6,8 +6,6 @@ Clone server Model Three
 Author: Min RK <benjaminrk@gmail.com
 """
 
-import random
-import time
 import zmq
 from kvmsg import KVMsg
 
@@ -18,7 +16,7 @@ class Route:
         self.identity = identity  # Identity of peer who requested state
 
 
-def send_single(key, kvmsg, route):
+def send_single(kvmsg, route):
     """Send one state snapshot key-value pair to a socket"""
     # Send identity of recipient first
     route.socket.send(route.identity, zmq.SNDMORE)
@@ -71,8 +69,8 @@ def main():
             route = Route(snapshot, identity)
 
             # For each entry in kvmap, send kvmsg to client
-            for k, v in kvmap.items():
-                send_single(k, v, route)
+            for v in kvmap.values():
+                send_single(v, route)
 
             # Now send END message with sequence number
             print(f"S: sending snapshot {sequence} {kvmap}")

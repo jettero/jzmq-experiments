@@ -73,9 +73,9 @@ class KVMsg(object):
         """Store me in a dict if I have anything to store
         else delete me from the dict."""
         if self.key is not None and self.body is not None:
-            dikt[self.key] = self
+            dikt[self.key.decode()] = self
         elif self.key in dikt:
-            del dikt[self.key]
+            del dikt[self.key.decode()]
 
     def send(self, socket):
         """Send key-value message to socket; any empty frames are sent as such."""
@@ -101,6 +101,11 @@ class KVMsg(object):
         return cls(seq, uuid=uuid, key=key, properties=prop, body=body)
 
     def __repr__(self):
+        if self.body is None:
+            return '<n/a>'
+        return self.body.decode()
+
+    def __pfft_repr__(self):
         if self.body is None:
             size = 0
             data=b'NULL'

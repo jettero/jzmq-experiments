@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # coding=utf-8
 
 """
@@ -5,24 +6,24 @@ Clone server Model Three
 Author: Min RK <benjaminrk@gmail.com
 """
 
-import zmq
 import random
 import time
-
-from kvmsg import *
-
+import zmq
+from kvmsg import KVMsg
 
 # simple struct for routing information for a key-value snapshot
 class Route:
     def __init__(self, socket, identity):
-        self.socket = socket # ROUTER socket to send to
-        self.identity = identity # Identity of peer who requested state
+        self.socket = socket  # ROUTER socket to send to
+        self.identity = identity  # Identity of peer who requested state
+
 
 def send_single(key, kvmsg, route):
     """Send one state snapshot key-value pair to a socket"""
     # Send identity of recipient first
     route.socket.send(route.identity, zmq.SNDMORE)
     kvmsg.send(route.socket)
+
 
 def main():
     # context and sockets
@@ -44,7 +45,7 @@ def main():
         try:
             items = dict(poller.poll(1000))
         except:
-            break           # Interrupted
+            break  # Interrupted
 
         # Apply state update sent from client
         if collector in items:
@@ -53,7 +54,7 @@ def main():
             kvmsg.sequence = sequence
             kvmsg.send(publisher)
             kvmsg.store(kvmap)
-            print ("I: publishing update %5d" % sequence)
+            print(f"U: publishing update {sequence} {kvmap}")
 
         # Execute state snapshot request
         if snapshot in items:
@@ -63,25 +64,26 @@ def main():
             if request == b"ICANHAZ?":
                 pass
             else:
-                print ("E: bad request, aborting\n")
+                print("E: bad request, aborting\n")
                 break
 
             # Send state snapshot to client
             route = Route(snapshot, identity)
 
             # For each entry in kvmap, send kvmsg to client
-            for k,v in kvmap.items():
-                send_single(k,v,route)
+            for k, v in kvmap.items():
+                send_single(k, v, route)
 
             # Now send END message with sequence number
-            print("Sending state shapshot=%d\n"% sequence)
+            print(f"S: sending snapshot {sequence} {kvmap}")
             snapshot.send(identity, zmq.SNDMORE)
             kvmsg = KVMsg(sequence)
             kvmsg.key = b"KTHXBAI"
             kvmsg.body = b""
             kvmsg.send(snapshot)
 
-    print(" Interrupted\n%d messages handled"%sequence)
+    print("E: Interrupted\nE: %d messages handled" % sequence)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

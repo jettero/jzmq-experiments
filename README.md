@@ -5,6 +5,25 @@ all the sockets really do or don't do or whatever. There's a lot of information
 on http://zguide.zeromq.org/py:all ; it's almost just too much to deal with ...
 while at the same time, it leaves me wondering REP? PUSH? DEALER? ... WTF?
 
+# initial goal
+
+I don't really have any goals, not really, I just want to learn zmq, but how can
+I get anywhere with that without something to do?
+
+So first, I'm going to make jzmq.StupidMessageBus or jSMB.
+
+## jSMB Features
+
+0. everything should be authenticated (via local-CA certfificate signing?)
+1. no central server, just a few name hints of places to try first
+2. once connected, try to discover more nodes and try to connect to those until
+   connected to the correct number of peers (by settings probably?)
+3. any message should broadcast to all hosts on the bus
+
+I think we'll add more requirements later (many channels? routed messages,
+directed messages, API/shell attachment points…), but for now …
+
+
 # Mah Table
 
 As I try to figure some of this out, I'm going to try to create a table of what

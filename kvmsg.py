@@ -30,14 +30,13 @@ def decode_properties(prop_s):
         try:
             key, value = line.split(b"=")
             prop[key] = value
-        except ValueError as e:
-            # Catch empty line
+        except ValueError:
             pass
 
     return prop
 
 
-class KVMsg(object):
+class KVMsg:
     """
     Message is formatted on wire as 5 frames:
     frame 0: key (0MQ string)
@@ -142,8 +141,8 @@ def test_kvmsg(verbose):
     ctx = zmq.Context()
     output = ctx.socket(zmq.DEALER)
     output.bind("ipc://kvmsg_selftest.ipc")
-    input = ctx.socket(zmq.DEALER)
-    input.connect("ipc://kvmsg_selftest.ipc")
+    input_ = ctx.socket(zmq.DEALER)
+    input_.connect("ipc://kvmsg_selftest.ipc")
 
     kvmap = {}
     # Test send and receive of simple message
@@ -155,7 +154,7 @@ def test_kvmsg(verbose):
     kvmsg.send(output)
     kvmsg.store(kvmap)
 
-    kvmsg2 = KVMsg.recv(input)
+    kvmsg2 = KVMsg.recv(input_)
     if verbose:
         kvmsg2.dump()
     assert kvmsg2.key == b"key"
@@ -172,7 +171,7 @@ def test_kvmsg(verbose):
     if verbose:
         kvmsg.dump()
     kvmsg.send(output)
-    kvmsg2 = KVMsg.recv(input)
+    kvmsg2 = KVMsg.recv(input_)
     if verbose:
         kvmsg2.dump()
     # ensure properties were preserved

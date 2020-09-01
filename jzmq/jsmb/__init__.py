@@ -1,3 +1,3 @@
 # coding: utf-8
 
-from node import StupidNode
+from .node import StupidNode

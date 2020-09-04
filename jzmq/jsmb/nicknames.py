@@ -20,7 +20,10 @@ class NicknamesMixin:
                 read_rn, write_rn = scope_bind(real_name)
                 p = property(read_rn)
                 p = p.setter(write_rn)
-                for nickname in cls._nicknames[real_name]:
+                iter_obj = cls._nicknames[real_name]
+                if isinstance(iter_obj, str):
+                    iter_obj = (iter_obj,)
+                for nickname in iter_obj:
                     if nicknames_debug:
                         if callable(nicknames_debug):
                             nicknames_debug(real_name, nickname)

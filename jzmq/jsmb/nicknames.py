@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+
 class NicknamesMixin:
     def __new__(cls, *a, nicknames_debug=False, **kw):
-        if hasattr(cls, '_nicknames'):
+        if hasattr(cls, "_nicknames"):
             if nicknames_debug:
                 if not callable(nicknames_debug):
                     print(f"NicknamesMixin(cls={cls})")
+
             def scope_bind(real_name):
                 def read_rn(self):
                     return getattr(self, real_name)
@@ -28,7 +30,8 @@ class NicknamesMixin:
                         if callable(nicknames_debug):
                             nicknames_debug(real_name, nickname)
                         else:
-                            print(f'  setting nickname {real_name} -> {nickname}')
+                            print(f"  setting nickname {real_name} -> {nickname}")
                     setattr(cls, nickname, p)
             del cls._nicknames
-        return super().__new__(cls, *a, **kw)
+        obj = super().__new__(cls)
+        return obj

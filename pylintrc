@@ -17,7 +17,7 @@ files-output=no
 bad-functions = input
 
 [TYPECHECK]
-generated-members=zmq.*
+generated-members=zmq.*,DumbThing.*,StupidNode.*
 
 [DESIGN]
 max-line-length     = 200

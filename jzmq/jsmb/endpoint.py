@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # coding: utf-8
 
 import re
@@ -24,6 +23,28 @@ _slurpies = (
 
 
 class Endpoint:
+    """ Eescribe an endpoint
+
+        The single argument 'description' is any of the following
+
+        * a hostname (or a star, etc)
+        * an IP address
+        * an address and port pair (e.g. host:5555)
+        * an address and port list (e.g., host:5555,5556,5557)
+        * a whole URL (e.g., tcp://host:555), which can also have a port list
+
+        Any specified ports drop into slots in this order:
+
+        * PUBLISH_PORT (default 5555)
+        * COLLECTOR_PORT (default 5556)
+        * DIRECTED_PORT (default 5557)
+
+        If any but not all ports are specified in the endpoint string, the next
+        values in the series are incremented from the last specified.  That is,
+        'host:80' implies 'host:80,81,82' and 'host:80,85' implies
+        'host:80,85,86'.
+    """
+
     host = "localhost"
 
     pub = DEFAULT_PUBLISH_PORT

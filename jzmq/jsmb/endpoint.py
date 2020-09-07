@@ -55,6 +55,7 @@ class Endpoint:
     def __init__(self, description):
         for slurpizer in _slurpies:
             if slurpizer.match(description):
+
                 def _portz(s):
                     if s:
                         for x in re.split(r"\D+", s):

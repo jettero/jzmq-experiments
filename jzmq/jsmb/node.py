@@ -3,8 +3,9 @@
 import zmq
 from .endpoint import Endpoint
 
+
 class StupidNode:
-    def __init__( self, endpoint='*', *endpoints):
+    def __init__(self, endpoint="*", *endpoints):
         self.endpoint = Endpoint(endpoint)
 
         ctx = zmq.Context()
@@ -13,9 +14,9 @@ class StupidNode:
         self.router = ctx.socket(zmq.ROUTER)
         self.sub = None
 
-        self.bind( self.pub )
-        self.bind( self.pull )
-        self.bind( self.router )
+        self.bind(self.pub)
+        self.bind(self.pull)
+        self.bind(self.router)
 
         self.connect_to_endpoints(*endpoints)
 
@@ -37,7 +38,7 @@ class StupidNode:
 
     def connect_to_endpoint(self, endpoint):
         if not isinstance(endpoint, Endpoint):
-            endpoint = Endpoint.slurp(endpoint)
+            endpoint = Endpoint(endpoint)
         self.sub.connect(endpoint.format(zmq.SUB))
 
     def __repr__(self):

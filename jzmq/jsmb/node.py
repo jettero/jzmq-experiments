@@ -2,14 +2,21 @@
 
 import zmq
 from .endpoint import Endpoint
+
 # from zmq.auth.thread import ThreadAuthenticator
+
+
+def default_callback(socket):
+    msg = socket.recv()
+    print(f"{socket}.recv(): {msg}")
+
 
 class StupidNode:
     def __init__(self, endpoint="*", identity=None):
         self.endpoint = Endpoint(endpoint)
 
-        self.identity = identity or f'SN-{id(self)}'
-        self.channel  = ''
+        self.identity = identity or f"SN-{id(self)}"
+        self.channel = ""
         # subscriptions specify channel names, '' appears to be a wildcard
 
         self.ctx = zmq.Context()
@@ -30,7 +37,7 @@ class StupidNode:
         self._callbacks = dict()
 
     def publish_message(self, msg):
-        if not isinstance(msg, (bytes,bytearray)):
+        if not isinstance(msg, (bytes, bytearray)):
             msg = msg.encode()
         self.pub.send(msg)
 
@@ -39,15 +46,11 @@ class StupidNode:
             for item in self._callbacks:
                 if item.fileno() == socket:
                     socket = item
-        cb = self._callbacks.get(socket, self.default_callback)
+        cb = self._callbacks.get(socket, default_callback)
         return cb(socket)
 
     def set_callback(self, socket, callback):
         self._callbacks[socket] = callback
-
-    def default_callback(self, socket):
-        msg = socket.recv()
-        print(f'{socket}.recv(): {msg}')
 
     def mk_socket(self, stype):
         # defaults:
@@ -79,7 +82,7 @@ class StupidNode:
         for item in items:
             if items[item] != zmq.POLLIN:
                 continue
-            ret.append( self.callback(item) )
+            ret.append(self.callback(item))
         return ret
 
     def __del__(self):

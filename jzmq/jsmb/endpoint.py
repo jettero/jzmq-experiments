@@ -82,11 +82,11 @@ class Endpoint:
         return f"{self.host}:[pub={self.pub} pull={self.pull} router={self.router}]"
 
     def port(self, ptype=zmq.PUB):
-        if ptype == zmq.PUB:
+        if ptype in (zmq.PUB, zmq.SUB):
             return self.pub
-        if ptype == zmq.PULL:
+        if ptype in (zmq.PULL, zmq.PUSH):
             return self.pull
-        if ptype == zmq.ROUTER:
+        if ptype in (zmq.ROUTER, zmq.DEALER):
             return self.router
         raise ValueError(f"unknown type: {ptype}")
 

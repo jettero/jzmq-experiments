@@ -53,4 +53,5 @@ All my EARLS are Python-centric where possible.
 
 * https://zeromq.org/get-started/
 * https://pyzmq.readthedocs.io/en/latest/
+  * in particular: https://pyzmq.readthedocs.io/en/latest/morethanbindings.html
 * http://zguide.zeromq.org/py:all

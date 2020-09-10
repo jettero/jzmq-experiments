@@ -17,39 +17,41 @@ import zmq
 # there's a better way, please submit patch or otherwise let me know.
 
 ZMQ_SOCKET_TYPE_NAMES = (
-    'PAIR',
-    'PUB',
-    'SUB',
-    'REQ',
-    'REP',
-    'DEALER',
-    'ROUTER',
-    'XREQ',
-    'XREP',
-    'PULL',
-    'PUSH',
-    'XPUB',
-    'XSUB',
-    'UPSTREAM',
-    'DOWNSTREAM',
-    'STREAM',
-    'SERVER',
-    'CLIENT',
-    'RADIO',
-    'DISH',
-    'GATHER',
-    'SCATTER',
-    'DGRAM',
+    "PAIR",
+    "PUB",
+    "SUB",
+    "REQ",
+    "REP",
+    "DEALER",
+    "ROUTER",
+    "XREQ",
+    "XREP",
+    "PULL",
+    "PUSH",
+    "XPUB",
+    "XSUB",
+    "UPSTREAM",
+    "DOWNSTREAM",
+    "STREAM",
+    "SERVER",
+    "CLIENT",
+    "RADIO",
+    "DISH",
+    "GATHER",
+    "SCATTER",
+    "DGRAM",
 )
+
 
 def zmq_socket_type_name(socket_type_number):
     for item in ZMQ_SOCKET_TYPE_NAMES:
         try:
             if socket_type_number == getattr(zmq, item):
-                return f'zmq.{item}'
+                return f"zmq.{item}"
         except AttributeError:
             pass
-    return f'zmq.?UNKNOWN?'
+    return "zmq.?UNKNOWN?"
+
 
 class MyRE:
     h = _m = None

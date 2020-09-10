@@ -2,7 +2,54 @@
 # coding: utf-8
 
 import re
+import zmq
 
+# NOTE: I'd really rather use a definition from zmq for this list of
+# candidates...  or better yet, a built in that can translate back form
+# numbers to the constant name...
+#
+# but the only place where this list of words occurs together (near as I
+# can tell) is zmq.utils.constant_names.base_name and it has versions,
+# polling directions, thread priorities and all sorts of other shit, with
+# the socket type names thrown in the middle of the list.
+#
+# I just cut and pasted that part of the list out into this global... if
+# there's a better way, please submit patch or otherwise let me know.
+
+ZMQ_SOCKET_TYPE_NAMES = (
+    'PAIR',
+    'PUB',
+    'SUB',
+    'REQ',
+    'REP',
+    'DEALER',
+    'ROUTER',
+    'XREQ',
+    'XREP',
+    'PULL',
+    'PUSH',
+    'XPUB',
+    'XSUB',
+    'UPSTREAM',
+    'DOWNSTREAM',
+    'STREAM',
+    'SERVER',
+    'CLIENT',
+    'RADIO',
+    'DISH',
+    'GATHER',
+    'SCATTER',
+    'DGRAM',
+)
+
+def zmq_socket_type_name(socket_type_number):
+    for item in ZMQ_SOCKET_TYPE_NAMES:
+        try:
+            if socket_type_number == getattr(zmq, item):
+                return f'zmq.{item}'
+        except AttributeError:
+            pass
+    return f'zmq.?UNKNOWN?'
 
 class MyRE:
     h = _m = None

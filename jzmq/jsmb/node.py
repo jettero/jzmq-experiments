@@ -2,13 +2,13 @@
 
 import zmq
 from .endpoint import Endpoint
+from .util import zmq_socket_type_name
 
 # from zmq.auth.thread import ThreadAuthenticator
 
-
 def default_callback(socket):
     msg = socket.recv()
-    print(f"{socket}.recv(): {msg}")
+    print(f"{zmq_socket_type_name(socket.type)}.recv(): {msg}")
 
 
 class StupidNode:

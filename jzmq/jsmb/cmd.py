@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import sys
+import logging
 import click
 import zmq
 from .node import StupidNode
@@ -16,11 +17,20 @@ def read_a_line(socket):
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
+@click.option("-i", "--identity", type=str)
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
-def chat(laddr, raddr, verbosity):  # pylint: disable=unused-argument
+def chat(laddr, raddr, identity, verbosity):  # pylint: disable=unused-argument
 
-    sn = StupidNode(laddr).connect_to_endpoints(*raddr)
+    log_level = logging.ERROR
+    if verbosity > 0:
+        log_level = logging.INFO
+        if verbosity > 1:
+            log_level = logging.DEBUG
+
+    logging.basicConfig(level=log_level)
+
+    sn = StupidNode(laddr, identity=identity).connect_to_endpoints(*raddr)
     sn.poller.register(sys.stdin, zmq.POLLIN)
     sn.set_callback(sys.stdin, read_a_line)
 

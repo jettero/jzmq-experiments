@@ -3,15 +3,18 @@
 import os
 import re
 import zmq
-from .endpoint import Endpoint
-from .util import zmq_socket_type_name
 
 from zmq.auth.thread import ThreadAuthenticator
 
-DEFAULT_KEYRING = os.path.expanduser( os.path.join('~', '.config', 'jzmq', 'keyring') )
+from .util import zmq_socket_type_name
+from .endpoint import Endpoint
+
+DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
+
 
 def scrub_identity_name_for_certfile(x):
-    return re.sub(r'[^\w\d_-]+', '_', x)
+    return re.sub(r"[^\w\d_-]+", "_", x)
+
 
 def default_callback(socket):
     msg = socket.recv()
@@ -24,7 +27,7 @@ class StupidNode:
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
         self.endpoint = Endpoint(endpoint)
         self.identity = identity or f"SN-{self.endpoint.pub}"
-        self.channel = "" # subscription filter (I think)
+        self.channel = ""  # subscription filter (I think)
         self.keyring = keyring
 
         self.ctx = zmq.Context()
@@ -49,8 +52,8 @@ class StupidNode:
     def start_auth(self):
         self.auth = ThreadAuthenticator(self.ctx)
         self.auth.start()
-        self.auth.allow('127.0.0.1')
-        self.auth.configure_curve(domain='*', location=self.keyring)
+        self.auth.allow("127.0.0.1")
+        self.auth.configure_curve(domain="*", location=self.keyring)
         self.load_or_create_key()
 
     @property
@@ -59,11 +62,11 @@ class StupidNode:
 
     @property
     def key_filename(self):
-        return os.path.join(self.keyring, self.key_basename + '.key')
+        return os.path.join(self.keyring, self.key_basename + ".key")
 
     @property
     def secret_key_filename(self):
-        return self.key_filename + '_secret'
+        return self.key_filename + "_secret"
 
     def load_key(self):
         self.pubkey, self.privkey = zmq.auth.load_certificate(self.secret_key_filename)
@@ -159,7 +162,7 @@ class StupidNode:
         server_key_fname = scrub_identity_name_for_certfile(endpoint.host) + ".key"
         server_key_pathname = os.path.join(self.keyring, server_key_fname)
         server_key, _ = zmq.auth.load_certificate(server_key_pathname)
-        sub.curve_serverkey = server_key;
+        sub.curve_serverkey = server_key
         # /XXX
 
         sub.setsockopt_string(zmq.SUBSCRIBE, self.channel)

@@ -1,0 +1,6 @@
+
+- the auth thread only picks up certs at the start. If you later copy a
+  cert into the keyring, the auth thread won't recognize it.
+  - do we just restart the auth thread?
+  - restart the daemon when add certs? ...
+  - there's gotta be some way to rescan

@@ -10,6 +10,7 @@ from zmq.auth.thread import ThreadAuthenticator
 
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
+from socket import gethostname
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
@@ -34,11 +35,11 @@ class StupidNode:
         log.debug('begin node setup')
 
         self.endpoint = Endpoint(endpoint)
-        self.identity = identity or f"SN-{self.endpoint.pub}"
+        self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
         self.channel = ""  # subscription filter (I think)
         self.keyring = keyring
 
-        log.debug('creating context')
+        log.debug('creating context; identity=%s', self.identity)
 
         self.ctx = zmq.Context()
         self.cleartext_ctx = zmq.Context()
@@ -252,7 +253,9 @@ class StupidNode:
                         #     for k,v in metadata.items():
                         #         f.write(f"    {k} = {v}\n")
                         fh.write(b'curve\n')
-                        fh.write(f'    public-key = "{public_key}"\n'.encode())
+                        fh.write(b'    public-key = "')
+                        fh.write(public_key)
+                        fh.write(b'"')
         log.debug('loading certificate %s', epubk_pname)
         ret, _ = zmq.auth.load_certificate(epubk_pname)
         return ret

@@ -5,7 +5,7 @@ import sys
 import logging
 import click
 import zmq
-from .node import StupidNode
+from .node import StupidNode, DEFAULT_KEYRING
 
 to_send = list()
 
@@ -17,10 +17,11 @@ def read_a_line(socket):
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
-@click.option("-i", "--identity", type=str)
+@click.option("-k", "--keyring", type=click.Path(), default=DEFAULT_KEYRING, show_default=True)
+@click.option("-i", "--identity", type=str, help='[default <hostname>-<baseport>]')
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
-def chat(laddr, raddr, identity, verbosity):  # pylint: disable=unused-argument
+def chat(laddr, raddr, identity, verbosity, keyring):  # pylint: disable=unused-argument
 
     log_level = logging.ERROR
     if verbosity > 0:
@@ -30,7 +31,7 @@ def chat(laddr, raddr, identity, verbosity):  # pylint: disable=unused-argument
 
     logging.basicConfig(level=log_level)
 
-    sn = StupidNode(laddr, identity=identity).connect_to_endpoints(*raddr)
+    sn = StupidNode(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
     sn.poller.register(sys.stdin, zmq.POLLIN)
     sn.set_callback(sys.stdin, read_a_line)
 

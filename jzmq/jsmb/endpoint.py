@@ -66,6 +66,7 @@ class Endpoint:
     def __init__(self, description):
         for slurpizer in _slurpies:
             if slurpizer.match(description):
+
                 def portz_(s):
                     if s:
                         for x in re.split(r"\D+", s):
@@ -73,6 +74,7 @@ class Endpoint:
                                 yield int(x)
                             except TypeError:
                                 pass
+
                 portz = list(portz_(slurpizer["ports"]))
                 if portz:
                     while len(portz) < len(self._port_names):

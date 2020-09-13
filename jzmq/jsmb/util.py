@@ -110,3 +110,36 @@ class MyRE:
             if h:
                 ret += f" named_groups={h}"
         return ret + ")"
+
+class CallOnEachFactory(dict):
+    class CallOnEach:
+        def __init__(self, calltable, name):
+            self.calltable = calltable
+            self.name = name
+
+        def __call__(self, *a, **kw):
+            ret = dict()
+            for k, v in self.calltable.items():
+                ret[k] = v(*a, **kw)
+            return ret
+
+        def __repr__(self):
+            return f'CallOnEach< {list(self.calltable)}.{self.name}() >'
+
+    def __getattribute__(self, name):
+        try:
+            return super().__getattribute__(name)
+        except AttributeError as e:
+            nevermind = e
+
+        try:
+            collected = dict()
+            for k,v in self.items():
+                ga = getattr(v, name)
+                if callable(ga):
+                    collected[k] = ga
+                else:
+                    raise nevermind
+            return self.CallOnEach(collected, name)
+        except AttributeError:
+            raise nevermind

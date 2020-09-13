@@ -24,7 +24,7 @@ _slurpies = (
 
 
 class Endpoint:
-    """ Eescribe an endpoint
+    """ Describe an endpoint
 
         The single argument 'description' is any of the following
 

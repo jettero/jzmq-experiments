@@ -27,6 +27,7 @@ def default_callback(socket):
     msg = socket.recv()
     print(f"{zmq_socket_type_name(socket.type)}.recv(): {msg}")
 
+
 class StupidNode:
     pubkey = privkey = auth = None
 
@@ -269,13 +270,16 @@ class StupidNode:
         log.debug("remote endpoints connected")
         return self
 
-    def _connect_socket(self, endpoint, stype, pubkey, preconnect=None):
-        log.debug("creating %s socket to endpoint=%s", zmq_socket_type_name(stype), endpoint)
+    def _create_connected_socket(self, endpoint, stype, pubkey, preconnect=None):
+        log.debug(
+            "creating %s socket to endpoint=%s", zmq_socket_type_name(stype), endpoint
+        )
         s = self.mk_socket(stype)
         s.curve_serverkey = pubkey
         if callable(preconnect):
             preconnect(s)
         s.connect(endpoint.format(zmq.SUB))
+        return s
 
     def connect_to_endpoint(self, endpoint):
         if not isinstance(endpoint, Endpoint):
@@ -285,11 +289,11 @@ class StupidNode:
         epk = self.learn_or_load_endpoint_pubkey(endpoint)
 
         sos = lambda s: s.setsockopt_string(zmq.SUBSCRIBE, self.channel)
-        sub = self._connect_socket(endpoint, zmq.SUB, epk, sos)
+        sub = self._create_connected_socket(endpoint, zmq.SUB, epk, sos)
         self.poller.register(sub, zmq.POLLIN)
         self.sub[endpoint] = sub
 
-        psh = self._connect_socket(endpoint, zmq.PUSH, epk)
+        psh = self._create_connected_socket(endpoint, zmq.PUSH, epk)
         self.push[endpoint] = psh
 
         return self

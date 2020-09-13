@@ -13,7 +13,7 @@
     etc.
   - So, in our test architecture, let's have 5 nodes (A-E), each connected to two
     others and try to come up with as much path variety as possible... hrm.
-    - We definitely want to see graph cycles 
+    - We definitely want to see graph cycles
     - and symmetry (A→B, B→A)
     - and "Isolated" nodes: meaning if they PUBlish, there's no subscribers
     - I think this pretty good according to the above:

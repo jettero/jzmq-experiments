@@ -9,7 +9,7 @@ from socket import gethostname
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
-from .util import zmq_socket_type_name
+from .util import zmq_socket_type_name, CallOnEachFactory
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
@@ -26,7 +26,6 @@ def scrub_identity_name_for_certfile(x):
 def default_callback(socket):
     msg = socket.recv()
     print(f"{zmq_socket_type_name(socket.type)}.recv(): {msg}")
-
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -53,7 +52,8 @@ class StupidNode:
         self.router = self.mk_socket(zmq.ROUTER)
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
-        self.sub = list()
+        self.sub = CallOnEachFactory()
+        self.push = CallOnEachFactory()
 
         log.debug("binding sockets")
 
@@ -269,17 +269,29 @@ class StupidNode:
         log.debug("remote endpoints connected")
         return self
 
+    def _connect_socket(self, endpoint, stype, pubkey, preconnect=None):
+        log.debug("creating %s socket to endpoint=%s", zmq_socket_type_name(stype), endpoint)
+        s = self.mk_socket(stype)
+        s.curve_serverkey = pubkey
+        if callable(preconnect):
+            preconnect(s)
+        s.connect(endpoint.format(zmq.SUB))
+
     def connect_to_endpoint(self, endpoint):
         if not isinstance(endpoint, Endpoint):
             endpoint = Endpoint(endpoint)
 
-        log.debug("creating zmq.SUB socket to endpoint=%s", endpoint)
-        sub = self.mk_socket(zmq.SUB)
-        sub.curve_serverkey = self.learn_or_load_endpoint_pubkey(endpoint)
-        sub.setsockopt_string(zmq.SUBSCRIBE, self.channel)
-        sub.connect(endpoint.format(zmq.SUB))
+        log.debug("learning or loading endpoint=%s pubkey", endpoint)
+        epk = self.learn_or_load_endpoint_pubkey(endpoint)
+
+        sos = lambda s: s.setsockopt_string(zmq.SUBSCRIBE, self.channel)
+        sub = self._connect_socket(endpoint, zmq.SUB, epk, sos)
         self.poller.register(sub, zmq.POLLIN)
-        self.sub.append(sub)
+        self.sub[endpoint] = sub
+
+        psh = self._connect_socket(endpoint, zmq.PUSH, epk)
+        self.push[endpoint] = psh
+
         return self
 
     def __repr__(self):

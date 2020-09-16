@@ -34,7 +34,11 @@ class StupidNode:
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
         log.debug("begin node setup")
 
-        self.endpoint = Endpoint(endpoint)
+        if isinstance(endpoint, Endpoint):
+            self.endpoint = endpoint
+        else:
+            self.endpoint = Endpoint(endpoint)
+
         self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
         self.channel = ""  # subscription filter (I think)
         self.keyring = keyring

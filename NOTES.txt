@@ -17,7 +17,7 @@
     - and symmetry (A→B, B→A)
     - and "Isolated" nodes: meaning if they PUBlish, there's no subscribers
     - I think this pretty good according to the above:
-      A → B, A → C
-      B → C, B → D
-      C → A, C → D
-      D → A, D → B
+      TEST_ARCH    A → B, A → C
+      TEST_ARCH    B → C, B → D
+      TEST_ARCH    C → A, C → D
+      TEST_ARCH    D → A, D → B

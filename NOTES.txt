@@ -19,5 +19,5 @@
     - I think this pretty good according to the above:
       A → B, A → C
       B → C, B → D
+      C → A, C → D
       D → A, D → B
-      E → D, E → C

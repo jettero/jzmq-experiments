@@ -31,19 +31,17 @@ class StupidNode:
     pubkey = privkey = auth = None
     channel = ""  # subscription filter or something (I think)
 
+    PORTS = 4  # as we add or remove ports, make sure this is the number of ports a StupidNode uses
+
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
-        self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
         self.keyring = keyring
+        self.endpoint = (
+            endpoint if isinstance(endpoint, Endpoint) else Endpoint(endpoint)
+        )
+        self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
         self.log = logging.getLogger(f"SN({self.identity})")
 
-        self.log.debug("begin node setup")
-
-        if isinstance(endpoint, Endpoint):
-            self.endpoint = endpoint
-        else:
-            self.endpoint = Endpoint(endpoint)
-
-        self.log.debug("creating context; identity=%s", self.identity)
+        self.log.debug("begin node setup / creating context")
 
         self.ctx = zmq.Context()
         self.cleartext_ctx = zmq.Context()

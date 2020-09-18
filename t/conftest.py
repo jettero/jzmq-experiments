@@ -97,13 +97,22 @@ def _generate_nodes(tarch_desc):
         raddrs = tuple(tarch_desc[n].raddr for n in endpn)
         rids = tuple(tarch_desc[n].ident for n in endpn)
         log.info("creating %s → %s", tn.ident, ", ".join(rids))
-        tmp.append(
-            (StupidNode(tn.laddr, identity=tn.ident, keyring="t/test-keyring"), raddrs)
-        )
+        sn = StupidNode(tn.laddr, identity=tn.ident, keyring="t/test-keyring")
+        tmp.append((sn, raddrs))
+
+    def set_callback_and_bind_list(node):
+        node.received_messages = msgs = list()
+
+        def the_callback(socket):
+            msgs.append(socket.recv().decode().rstrip())
+
+        for s in (node.sub, node.pull):
+            node.set_callback(s, the_callback)
 
     for node, raddrs in tmp:
         log.info("connecting %s to endpoints=%s", node, raddrs)
         node.connect_to_endpoints(*raddrs)
+        set_callback_and_bind_list(node)
 
     return [x for x, _ in tmp]
 

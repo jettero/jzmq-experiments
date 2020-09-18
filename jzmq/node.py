@@ -15,6 +15,7 @@ from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
+
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
@@ -28,12 +29,12 @@ def default_callback(socket):
 
 class StupidNode:
     pubkey = privkey = auth = None
-    channel = "" # subscription filter or something (I think)
+    channel = ""  # subscription filter or something (I think)
 
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
         self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
         self.keyring = keyring
-        self.log = logging.getLogger(f'SN({self.identity})')
+        self.log = logging.getLogger(f"SN({self.identity})")
 
         self.log.debug("begin node setup")
 
@@ -41,7 +42,6 @@ class StupidNode:
             self.endpoint = endpoint
         else:
             self.endpoint = Endpoint(endpoint)
-
 
         self.log.debug("creating context; identity=%s", self.identity)
 
@@ -87,7 +87,7 @@ class StupidNode:
     def wai_reply_machine(self, socket):
         while self._wai_continue:
             if socket.poll(200):
-                self.log.debug('wai polled, trying to recv')
+                self.log.debug("wai polled, trying to recv")
                 msg = socket.recv()
                 ttype = zmq_socket_type_name(socket.type)
                 self.log.debug('receved "%s" over %s socket', msg, ttype)
@@ -163,7 +163,9 @@ class StupidNode:
 
         if enable_curve:
             socket = self.ctx.socket(stype)
-            self.log.debug("create %s socket in crypto context", zmq_socket_type_name(stype))
+            self.log.debug(
+                "create %s socket in crypto context", zmq_socket_type_name(stype)
+            )
         else:
             socket = self.cleartext_ctx.socket(stype)
             self.log.debug(
@@ -196,7 +198,7 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
-        self.log.debug('closekilling')
+        self.log.debug("closekilling")
         try:
             self.log.debug("trying to stop auth thread")
             self.auth.stop()
@@ -254,7 +256,9 @@ class StupidNode:
     def learn_or_load_endpoint_pubkey(self, endpoint):
         epubk_pname = self.pubkey_pathname(endpoint)
         if not os.path.isfile(epubk_pname):
-            self.log.debug("%s does not exist yet, trying to learn certificate", epubk_pname)
+            self.log.debug(
+                "%s does not exist yet, trying to learn certificate", epubk_pname
+            )
             node_id, public_key = self.cleartext_request(endpoint, "who are you?")
             if node_id:
                 epubk_pname = self.pubkey_pathname(node_id)

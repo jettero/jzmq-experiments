@@ -1,10 +1,11 @@
 # coding: utf-8
+# pylint: disable=redefined-outer-name
 
 import logging
 from collections import namedtuple
 import re
 import pytest
-from jzmq import StupidNode, Endpoint
+from jzmq import StupidNode
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +24,6 @@ def tarch_desc():
     with open("NOTES.txt", "r") as fh:
         for line in fh:
             if "TEST_ARCH" in line:
-                items = c.findall(line)
                 for lhs, rhs in c.findall(line):
                     if lhs not in tmp:
                         tmp[lhs] = Ndesc(
@@ -48,13 +48,15 @@ def _generate_nodes(tarch_desc):
         raddrs = tuple(tarch_desc[n].raddr for n in endpn)
         rids = tuple(tarch_desc[n].ident for n in endpn)
         log.info("creating %s → %s", tn.ident, ", ".join(rids))
-        tmp.append((StupidNode(tn.laddr, identity=tn.ident, keyring="t/test-keyring"), raddrs))
+        tmp.append(
+            (StupidNode(tn.laddr, identity=tn.ident, keyring="t/test-keyring"), raddrs)
+        )
 
-    for node,raddrs in tmp:
+    for node, raddrs in tmp:
         log.info("connecting %s to endpoints=%s", node, raddrs)
         node.connect_to_endpoints(*raddrs)
 
-    return [ x for x,_ in tmp ]
+    return [x for x, _ in tmp]
 
 
 @pytest.fixture(scope="function")

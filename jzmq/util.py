@@ -144,3 +144,6 @@ class CallOnEachFactory(dict):
             return self.CallOnEach(collected, name)
         except AttributeError:
             raise nevermind  # pylint: disable=raise-missing-from
+
+    def __hash__(self):
+        return hash("-".join(sorted(str(x) for x in self)))

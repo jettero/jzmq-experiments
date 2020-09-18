@@ -4,4 +4,4 @@
 from jzmq import chat
 
 if __name__ == "__main__":
-    chat()
+    chat()  # pylint: disable=no-value-for-parameter

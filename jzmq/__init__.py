@@ -1,4 +1,5 @@
+# coding: utf-8
 
-from .jsmb.node import StupidNode
-from .jsmb.endpoint import Endpoint
-from .jsmb.cmd import chat
+from .node import StupidNode
+from .endpoint import Endpoint
+from .cmd import chat

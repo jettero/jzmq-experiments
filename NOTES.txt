@@ -5,7 +5,7 @@
   - restart the daemon when add certs? ...
   - there's gotta be some way to rescan
 
-- when jzmq.jsmb.cmd receives a line of input, what should happen?
+- when jzmq.cmd receives a line of input, what should happen?
   - we'll need a decentralized infrastructure to talk about this I guess
   - in "A → B", say the arrow indicates A connecting to B, which implies
     all the channels we expect in the StupidNode object... A will subscribe

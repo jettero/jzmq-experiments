@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from jzmq.jsmb.endpoint import (
+from jzmq.endpoint import (
     Endpoint,
     DEFAULT_PUBLISH_PORT,
     DEFAULT_COLLECTOR_PORT,

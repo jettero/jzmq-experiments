@@ -4,6 +4,7 @@ import os
 import sys, signal
 import re
 import logging
+from threading import Thread
 from socket import gethostname
 
 import zmq
@@ -13,9 +14,6 @@ from .util import zmq_socket_type_name, CallOnEachFactory
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
-
-log = logging.getLogger(__name__)
-
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -30,27 +28,29 @@ def default_callback(socket):
 
 class StupidNode:
     pubkey = privkey = auth = None
+    channel = "" # subscription filter or something (I think)
 
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
-        log.debug("begin node setup")
+        self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
+        self.keyring = keyring
+        self.log = logging.getLogger(f'SN({self.identity})')
+
+        self.log.debug("begin node setup")
 
         if isinstance(endpoint, Endpoint):
             self.endpoint = endpoint
         else:
             self.endpoint = Endpoint(endpoint)
 
-        self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
-        self.channel = ""  # subscription filter (I think)
-        self.keyring = keyring
 
-        log.debug("creating context; identity=%s", self.identity)
+        self.log.debug("creating context; identity=%s", self.identity)
 
         self.ctx = zmq.Context()
         self.cleartext_ctx = zmq.Context()
 
         self.start_auth()
 
-        log.debug("creating sockets")
+        self.log.debug("creating sockets")
 
         self.pub = self.mk_socket(zmq.PUB)
         self.pull = self.mk_socket(zmq.PULL)
@@ -60,40 +60,43 @@ class StupidNode:
         self.sub = CallOnEachFactory()
         self.push = CallOnEachFactory()
 
-        log.debug("binding sockets")
+        self.log.debug("binding sockets")
 
         self.bind(self.pub)
         self.bind(self.pull)
         self.bind(self.router)
         self.bind(self.rep, enable_curve=False)
 
-        log.debug("registering polling")
+        self.log.debug("registering polling")
 
         self.poller = zmq.Poller()
         self.poller.register(self.pull, zmq.POLLIN)
-        self.poller.register(self.rep, zmq.POLLIN)
 
         self._callbacks = dict()
 
-        log.debug("registering WAI reply machine")
-
-        self.set_callback(self.rep, self.wai_reply_machine)
-
-        log.debug("configuring interrupt signal")
+        self.log.debug("configuring interrupt signal")
         signal.signal(signal.SIGINT, self.interrupt)
 
-        log.debug("node setup complete")
+        self.log.debug("configuring WAI Reply Thread")
+        self._wai_thread = Thread(target=self.wai_reply_machine, args=(self.rep,))
+        self._wai_continue = True
+        self._wai_thread.start()
+
+        self.log.debug("node setup complete")
 
     def wai_reply_machine(self, socket):
-        msg = socket.recv()
-        ttype = zmq_socket_type_name(socket.type)
-        log.debug('receved "%s" over %s socket', msg, ttype)
-        msg = [self.identity.encode(), self.pubkey]
-        log.debug('sending "%s" as reply over %s socket', msg, ttype)
-        socket.send_multipart(msg)
+        while self._wai_continue:
+            if socket.poll(200):
+                self.log.debug('wai polled, trying to recv')
+                msg = socket.recv()
+                ttype = zmq_socket_type_name(socket.type)
+                self.log.debug('receved "%s" over %s socket', msg, ttype)
+                msg = [self.identity.encode(), self.pubkey]
+                self.log.debug('sending "%s" as reply over %s socket', msg, ttype)
+                socket.send_multipart(msg)
 
     def start_auth(self):
-        log.debug("starting auth thread")
+        self.log.debug("starting auth thread")
         self.auth = ThreadAuthenticator(self.ctx)
         self.auth.start()
         self.auth.allow("127.0.0.1")
@@ -113,15 +116,15 @@ class StupidNode:
         return self.key_filename + "_secret"
 
     def load_key(self):
-        log.debug("loading node key-pair")
+        self.log.debug("loading node key-pair")
         self.pubkey, self.privkey = zmq.auth.load_certificate(self.secret_key_filename)
 
     def load_or_create_key(self):
         try:
             self.load_key()
         except IOError as e:
-            log.debug("error loading key: %s", e)
-            log.debug("creating node key-pair")
+            self.log.debug("error loading key: %s", e)
+            self.log.debug("creating node key-pair")
             os.makedirs(self.keyring, mode=0o0700, exist_ok=True)
             zmq.auth.create_certificates(self.keyring, self.key_basename)
             self.load_key()
@@ -129,7 +132,7 @@ class StupidNode:
     def publish_message(self, msg):
         if not isinstance(msg, (bytes, bytearray)):
             msg = msg.encode()
-        log.debug("publishing message: %s", msg)
+        self.log.debug("publishing message: %s", msg)
         self.pub.send(msg)
 
     def callback(self, socket):
@@ -160,10 +163,10 @@ class StupidNode:
 
         if enable_curve:
             socket = self.ctx.socket(stype)
-            log.debug("create %s socket in crypto context", zmq_socket_type_name(stype))
+            self.log.debug("create %s socket in crypto context", zmq_socket_type_name(stype))
         else:
             socket = self.cleartext_ctx.socket(stype)
-            log.debug(
+            self.log.debug(
                 "create %s socket in cleartext context", zmq_socket_type_name(stype)
             )
 
@@ -193,17 +196,25 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
+        self.log.debug('closekilling')
         try:
-            log.debug("trying to stop auth thread")
+            self.log.debug("trying to stop auth thread")
             self.auth.stop()
-            log.debug("auth thread seems to have stopped")
+            self.log.debug("auth thread seems to have stopped")
         except AttributeError:
-            log.debug("there does not seem to be an auth thread to stop")
+            self.log.debug("there does not seem to be an auth thread to stop")
 
-        log.debug("destroying cleartext context")
+        if self._wai_thread and self._wai_thread.is_alive():
+            self.log.debug("WAI Thread seems to be alive, trying to join")
+            self._wai_continue = False
+            self._wai_thread.join()
+            self.log.debug("WAI Thread seems to jave joined us.")
+            self._wai_thread = None
+
+        self.log.debug("destroying cleartext context")
         self.cleartext_ctx.destroy(1)
 
-        log.debug("destroying crypto context")
+        self.log.debug("destroying crypto context")
         self.ctx.destroy(1)
 
     def __del__(self):
@@ -223,11 +234,11 @@ class StupidNode:
         req.connect(endpoint.format(zmq.REQ))
         if not isinstance(msg, (bytes, bytearray)):
             msg = msg.encode()
-        log.debug("sending cleartext request: %s", msg)
+        self.log.debug("sending cleartext request: %s", msg)
         req.send(msg)
-        log.debug("waiting for reply")
+        self.log.debug("waiting for reply")
         res = req.recv_multipart()
-        log.debug("received reply: %s", res)
+        self.log.debug("received reply: %s", res)
         if len(res) == 2:
             return res
         req.close()
@@ -243,7 +254,7 @@ class StupidNode:
     def learn_or_load_endpoint_pubkey(self, endpoint):
         epubk_pname = self.pubkey_pathname(endpoint)
         if not os.path.isfile(epubk_pname):
-            log.debug("%s does not exist yet, trying to learn certificate", epubk_pname)
+            self.log.debug("%s does not exist yet, trying to learn certificate", epubk_pname)
             node_id, public_key = self.cleartext_request(endpoint, "who are you?")
             if node_id:
                 epubk_pname = self.pubkey_pathname(node_id)
@@ -263,19 +274,19 @@ class StupidNode:
                         fh.write(b'    public-key = "')
                         fh.write(public_key)
                         fh.write(b'"')
-        log.debug("loading certificate %s", epubk_pname)
+        self.log.debug("loading certificate %s", epubk_pname)
         ret, _ = zmq.auth.load_certificate(epubk_pname)
         return ret
 
     def connect_to_endpoints(self, *endpoints):
-        log.debug("connecting remote endpoints")
+        self.log.debug("connecting remote endpoints")
         for item in endpoints:
             self.connect_to_endpoint(item)
-        log.debug("remote endpoints connected")
+        self.log.debug("remote endpoints connected")
         return self
 
     def _create_connected_socket(self, endpoint, stype, pubkey, preconnect=None):
-        log.debug(
+        self.log.debug(
             "creating %s socket to endpoint=%s", zmq_socket_type_name(stype), endpoint
         )
         s = self.mk_socket(stype)
@@ -289,7 +300,7 @@ class StupidNode:
         if not isinstance(endpoint, Endpoint):
             endpoint = Endpoint(endpoint)
 
-        log.debug("learning or loading endpoint=%s pubkey", endpoint)
+        self.log.debug("learning or loading endpoint=%s pubkey", endpoint)
         epk = self.learn_or_load_endpoint_pubkey(endpoint)
 
         sos = lambda s: s.setsockopt_string(zmq.SUBSCRIBE, self.channel)
@@ -303,4 +314,4 @@ class StupidNode:
         return self
 
     def __repr__(self):
-        return f"StupidNode({self.endpoint})"
+        return f"StupidNode({self.identity})"

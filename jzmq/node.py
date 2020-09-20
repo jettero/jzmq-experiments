@@ -24,7 +24,7 @@ def scrub_identity_name_for_certfile(x):
 
 def default_callback(socket):
     msg = socket.recv()
-    print(f"{zmq_socket_type_name(socket.type)}.recv(): {msg}")
+    log.info("<default_callback:%s>(%s)", zmq_socket_type_name(socket.type), msg)
 
 
 class StupidNode:
@@ -130,7 +130,7 @@ class StupidNode:
     def publish_message(self, msg):
         if not isinstance(msg, (bytes, bytearray)):
             msg = msg.encode()
-        self.log.debug("publishing message: %s", msg)
+        self.log.info("publishing message: %s", msg)
         self.pub.send(msg)
 
     def callback(self, socket):
@@ -172,8 +172,8 @@ class StupidNode:
 
         socket.linger = 1
         socket.identity = self.identity.encode()
-        socket.reconnect_ivl = 100
-        socket.reconnect_ivl_max = 5000
+        socket.reconnect_ivl = 1000
+        socket.reconnect_ivl_max = 10000
 
         if enable_curve:
             socket.curve_secretkey = self.privkey

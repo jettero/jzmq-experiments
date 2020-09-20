@@ -295,7 +295,7 @@ class StupidNode:
         s.curve_serverkey = pubkey
         if callable(preconnect):
             preconnect(s)
-        s.connect(endpoint.format(zmq.SUB))
+        s.connect(endpoint.format(stype))
         return s
 
     def connect_to_endpoint(self, endpoint):

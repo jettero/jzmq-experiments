@@ -25,14 +25,10 @@ def test_tarch_construction(tarch):
 
 
 def test_tarch_msgs(tarch):
-    log.info("sleeping for 5 seconds... does this matter??")
-    time.sleep(5)
-    log.info("about to publish message")
-    time.sleep(1)
     test_msg = "test_tarch_msgs"
     tarch.A.publish_message(test_msg)
-    log.info("message published, waiting for replies")
-    time.sleep(1)
+    for node in tarch:
+        node.poll()
     for node in tarch:
         if node == tarch.A:
             continue

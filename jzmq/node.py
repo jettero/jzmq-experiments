@@ -15,7 +15,6 @@ from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
-
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
@@ -24,7 +23,10 @@ def scrub_identity_name_for_certfile(x):
 
 def default_callback(socket):
     msg = socket.recv()
-    log.info("<default_callback:%s>(%s)", zmq_socket_type_name(socket.type), msg)
+    to_print = f"<default_callback:{zmq_socket_type_name(socket.type)}>({msg})"
+    log = logging.getLogger(__name__)
+    log.info(to_print)
+    print(to_print)
 
 
 class StupidNode:
@@ -55,8 +57,24 @@ class StupidNode:
         self.router = self.mk_socket(zmq.ROUTER)
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
-        self.sub = CallOnEachFactory()
-        self.push = CallOnEachFactory()
+        def my_raise(e, f=None):
+            if f:
+                raise e from f
+            raise e
+
+        sock_type = type(self.pub)
+        def vc(new, from_=None):
+            if not isinstance(new, sock_type):
+                my_raise(TypeError(f'this call factory must contain all {sock_type} values'), from_)
+            if old is not None and new.type != old.type:
+                my_raise(ValueError(f'this call factory must contain only {zmq_socket_type_name(old.type)} sockets'), from_)
+
+        def kc(new, from_=None):
+            if not isinstance(new, Endpoint):
+                my_raise(TypeError("All keys to this call factory must be Endpoints"), from_)
+
+        self.sub = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
+        self.push = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
 
         self.log.debug("binding sockets")
 
@@ -134,15 +152,13 @@ class StupidNode:
         self.pub.send(msg)
 
     def callback(self, socket):
-        if isinstance(socket, int):
-            for item in self._callbacks:
-                if item.fileno() == socket:
-                    socket = item
-        cb = self._callbacks.get(socket, default_callback)
+        cb = self._callbacks.get(socket.type, default_callback)
         return cb(socket)
 
     def set_callback(self, socket, callback):
-        self._callbacks[socket] = callback
+        if isinstance(socket, CallOnEachFactory):
+            socket, *_ = socket.values()
+        self._callbacks[socket.type] = callback
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -187,6 +203,7 @@ class StupidNode:
         for item in items:
             if items[item] != zmq.POLLIN:
                 continue
+            zmq_socket_type_name(item.type)
             ret.append(self.callback(item))
         return ret
 

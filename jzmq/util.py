@@ -127,23 +127,48 @@ class CallOnEachFactory(dict):
         def __repr__(self):
             return f"CallOnEach< {list(self.calltable)}.{self.name}() >"
 
+    def __init__(self, *a, key_constraint=None, val_constraint=None, **kw):
+        self.kc = key_constraint
+        self.vc = val_constraint
+        super().__init__(*a, **kw)
+
+    def _check_key(self, key, from_=None):
+        if self.kc is not None:
+            self.kc(key, from_)
+        if from_:
+            raise from_
+
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key)
+        except KeyError as e:
+            self._check_key(key, e)
+
+    def __setitem__(self, key, item):
+        self._check_key(key)
+        super().__setitem__(key,item)
+
     def __getattribute__(self, name):
         try:
             return super().__getattribute__(name)
         except AttributeError as e:
-            nevermind = e
+            if len(self) == 0:
+                raise
 
-        try:
+            nevermind = e
             collected = dict()
+
             for k, v in self.items():
-                ga = getattr(v, name)
+                try:
+                    ga = getattr(v, name)
+                except AttributeError:
+                    raise AttributeError(f'{v} has no {name} attribute') from nevermind
                 if callable(ga):
                     collected[k] = ga
                 else:
-                    raise nevermind
+                    raise TypeError(f'{v} has an uncallable {name} attribute') from nevermind
+
             return self.CallOnEach(collected, name)
-        except AttributeError:
-            raise nevermind  # pylint: disable=raise-missing-from
 
     def __hash__(self):
         return hash("-".join(sorted(str(x) for x in self)))

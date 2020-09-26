@@ -138,6 +138,10 @@ class CallOnEachFactory(dict):
         if from_:
             raise from_
 
+    def _check_val(self, new, old):
+        if self.vc is not None:
+            self.vc(new, old)
+
     def __getitem__(self, key):
         try:
             return super().__getitem__(key)
@@ -146,7 +150,8 @@ class CallOnEachFactory(dict):
 
     def __setitem__(self, key, item):
         self._check_key(key)
-        super().__setitem__(key,item)
+        self._check_val(item, self.get(key))
+        super().__setitem__(key, item)
 
     def __getattribute__(self, name):
         try:
@@ -162,11 +167,13 @@ class CallOnEachFactory(dict):
                 try:
                     ga = getattr(v, name)
                 except AttributeError:
-                    raise AttributeError(f'{v} has no {name} attribute') from nevermind
+                    raise AttributeError(f"{v} has no {name} attribute") from nevermind
                 if callable(ga):
                     collected[k] = ga
                 else:
-                    raise TypeError(f'{v} has an uncallable {name} attribute') from nevermind
+                    raise TypeError(
+                        f"{v} has an uncallable {name} attribute"
+                    ) from nevermind
 
             return self.CallOnEach(collected, name)
 

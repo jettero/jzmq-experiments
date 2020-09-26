@@ -16,15 +16,18 @@ from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
+
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
 
+
 def compute_callback_key(socket):
     if isinstance(socket, CallOnEachFactory):
         return id(socket)
     return socket.fileno()
+
 
 def default_callback(socket):
     msg = socket.recv()
@@ -32,6 +35,7 @@ def default_callback(socket):
     log = logging.getLogger(__name__)
     log.info(to_print)
     print(to_print)
+
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -67,15 +71,22 @@ class StupidNode:
             raise e
 
         sock_type = type(self.pub)
-        def vc(new, from_=None):
+
+        def vc(new, old):
             if not isinstance(new, sock_type):
-                my_raise(TypeError(f'this call factory must contain all {sock_type} values'), from_)
+                raise TypeError(
+                    f"this call factory must contain all {sock_type} values"
+                )
             if old is not None and new.type != old.type:
-                my_raise(ValueError(f'this call factory must contain only {zmq_socket_type_name(old.type)} sockets'), from_)
+                raise ValueError(
+                    f"this call factory must contain only {zmq_socket_type_name(old.type)} sockets"
+                )
 
         def kc(new, from_=None):
             if not isinstance(new, Endpoint):
-                my_raise(TypeError("All keys to this call factory must be Endpoints"), from_)
+                my_raise(
+                    TypeError("All keys to this call factory must be Endpoints"), from_
+                )
 
         self.sub = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
         self.push = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
@@ -114,7 +125,7 @@ class StupidNode:
                 msg = [self.identity.encode(), self.pubkey]
                 self.log.debug('sending "%s" as reply over %s socket', msg, ttype)
                 socket.send_multipart(msg)
-        self.log.debug('wai thread seems finished, loop broken')
+        self.log.debug("wai thread seems finished, loop broken")
 
     def start_auth(self):
         self.log.debug("starting auth thread")
@@ -161,11 +172,13 @@ class StupidNode:
             key = socket_or_key
             cbg = self._callbacks.get(key)
             if cbg is None:
-                raise Exception(f'no registered callback under key={key!r}; cannot guess applicable socket to use')
+                raise Exception(
+                    f"no registered callback under key={key!r}; cannot guess applicable socket to use"
+                )
             cb, socket = cbg
             socket = socket()
             if socket is None:
-                raise Exception(f'unable to find socket for key={key!r}')
+                raise Exception(f"unable to find socket for key={key!r}")
         else:
             socket = socket_or_key
             key = compute_callback_key(socket)
@@ -229,9 +242,11 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
-        for i in ('auth', 'ctx'):
-            if not  hasattr(self, i):
-                self.log.debug('already closekilled, skipping extra closekill invocation')
+        for i in ("auth", "ctx"):
+            if not hasattr(self, i):
+                self.log.debug(
+                    "already closekilled, skipping extra closekill invocation"
+                )
                 return
 
         self.log.debug("closekilling")

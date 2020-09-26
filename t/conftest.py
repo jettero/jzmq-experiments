@@ -5,7 +5,6 @@ import time
 import logging
 from collections import namedtuple
 import pytest
-from jzmq import StupidNode
 import t.tarch
 
 log = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ def tarch(tarch_desc):
     log.info("created tarch nodes")
     nodes = Nodes(*t.tarch.generate_nodes(tarch_desc))
 
-    time.sleep(1) # give everything a sec to connect
+    time.sleep(1)  # give everything a sec to connect
     yield nodes
 
     log.info("destroying tarch nodes")
@@ -44,6 +43,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--log-disable", action="append", default=[], help="disable specific loggers"
     )
+
 
 def pytest_configure(config):
     for name in config.getoption("--log-disable", default=[]):

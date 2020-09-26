@@ -97,12 +97,12 @@ def generate_nodes(tarch_desc):
     def set_callback_and_bind_list(node):
         node.received_messages = msgs = list()
 
-        def the_callback(socket):
-            msg = socket.recv().decode().rstrip()
+        def the_callback(sock):
+            msg = sock.recv().decode().rstrip()
             log.info(
                 "node=%s; <conftest:the_callback:%s>(%s)",
                 node,
-                zmq_socket_type_name(socket.type),
+                zmq_socket_type_name(sock.type),
                 msg,
             )
             msgs.append(msg)

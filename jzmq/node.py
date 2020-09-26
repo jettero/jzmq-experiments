@@ -11,7 +11,7 @@ import weakref
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
-from .util import zmq_socket_type_name, CallOnEachFactory
+from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
@@ -21,12 +21,6 @@ def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
-
-
-def compute_callback_key(socket):
-    if isinstance(socket, CallOnEachFactory):
-        return id(socket)
-    return socket.fileno()
 
 
 def default_callback(socket):
@@ -88,8 +82,8 @@ class StupidNode:
                     TypeError("All keys to this call factory must be Endpoints"), from_
                 )
 
-        self.sub = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
-        self.push = CallOnEachFactory(key_constraint=kc, val_constraint=vc)
+        self.sub = list()
+        self.push = list()
 
         self.log.debug("binding sockets")
 
@@ -167,28 +161,32 @@ class StupidNode:
         self.log.info("publishing message: %s", msg)
         self.pub.send(msg)
 
-    def callback(self, socket_or_key):
-        if isinstance(socket_or_key, int):
-            key = socket_or_key
-            cbg = self._callbacks.get(key)
-            if cbg is None:
-                raise Exception(
-                    f"no registered callback under key={key!r}; cannot guess applicable socket to use"
-                )
-            cb, socket = cbg
-            socket = socket()
-            if socket is None:
+    def callback(self, sock_or_key):
+        if isinstance(sock_or_key, int):
+            key = sock_or_key
+            cbe = self._callbacks.get(key)
+            if cbe is None:
+                raise Exception(f"no registered callback under key={key!r}; cannot guess applicable socket to use")
+            cb,sock = cbe
+            sock = sock()
+            if not sock:
                 raise Exception(f"unable to find socket for key={key!r}")
         else:
-            socket = socket_or_key
-            key = compute_callback_key(socket)
-            # key could be a fileno or the id of a CallOnEachFactory, do not use fileno() directly
-            cb, *_ = self._callbacks.get(key, (default_callback,))
-        return cb(socket)
+            sock = sock_or_key
+            key = sock.fileno()
+            cb,_ = self._callbacks.get(key, (default_callback,None))
+        return cb(sock)
 
-    def set_callback(self, socket, callback):
-        key = compute_callback_key(socket)
-        self._callbacks[key] = (callback, weakref.ref(socket))
+    def set_callback(self, sock, callback):
+        if sock in (self.sub, self.push):
+            self.log.debug('<set-callback [loop]> on %s', key, self)
+            for item in sock:
+                self.set_callback(item, callback)
+            return
+
+        key = sock.fileno()
+        self.log.debug('<set-callback [%d]> on %s', key, self)
+        self._callbacks[key] = (callback, weakref.ref(sock))
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -365,10 +363,10 @@ class StupidNode:
         sos = lambda s: s.setsockopt_string(zmq.SUBSCRIBE, self.channel)
         sub = self._create_connected_socket(endpoint, zmq.SUB, epk, sos)
         self.poller.register(sub, zmq.POLLIN)
-        self.sub[endpoint] = sub
+        self.sub.append(sub)
 
         psh = self._create_connected_socket(endpoint, zmq.PUSH, epk)
-        self.push[endpoint] = psh
+        self.push.append(psh)
 
         return self
 

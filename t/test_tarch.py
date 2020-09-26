@@ -23,12 +23,18 @@ def test_tarch_construction(tarch):
         assert isinstance(item, StupidNode)
 
 
-def test_tarch_msgs(tarch):
+def test_tarch_msgs_AB(tarch):
     test_msg = "test_tarch_msgs"
-    tarch.A.publish_message(test_msg)
-    for node in tarch:
-        node.poll()
-    for node in tarch:
-        if node == tarch.A:
-            continue
-        assert node.received_messages == [test_msg]
+
+    for _ in range(5):
+        tarch.B.poll(50)
+        tarch.A.poll(50)
+
+    tarch.B.publish_message(test_msg)
+
+    for _ in range(5):
+        tarch.B.poll(50)
+        tarch.A.poll(50)
+
+    assert tarch.B.received_messages == list()
+    assert tarch.A.received_messages == [test_msg]

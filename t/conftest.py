@@ -5,7 +5,7 @@ import time
 import logging
 from collections import namedtuple
 import pytest
-import t.tarch
+import t.arch
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def always_true():
 
 @pytest.fixture(scope="session")
 def tarch_desc():
-    return t.tarch.read_node_description()
+    return t.arch.read_node_description()
 
 
 @pytest.fixture(scope="function")
@@ -25,7 +25,7 @@ def tarch(tarch_desc):
     Nodes = namedtuple("Nodes", sorted(tarch_desc))
 
     log.info("created tarch nodes")
-    nodes = Nodes(*t.tarch.generate_nodes(tarch_desc))
+    nodes = Nodes(*t.arch.generate_nodes(tarch_desc))
 
     time.sleep(1)  # give everything a sec to connect
     yield nodes

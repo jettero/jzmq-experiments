@@ -6,6 +6,7 @@ import re
 import logging
 from threading import Thread
 from socket import gethostname
+import weakref
 
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
@@ -20,6 +21,10 @@ def scrub_identity_name_for_certfile(x):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
 
+def compute_callback_key(socket):
+    if isinstance(socket, CallOnEachFactory):
+        return id(socket)
+    return socket.fileno()
 
 def default_callback(socket):
     msg = socket.recv()
@@ -27,7 +32,6 @@ def default_callback(socket):
     log = logging.getLogger(__name__)
     log.info(to_print)
     print(to_print)
-
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -110,6 +114,7 @@ class StupidNode:
                 msg = [self.identity.encode(), self.pubkey]
                 self.log.debug('sending "%s" as reply over %s socket', msg, ttype)
                 socket.send_multipart(msg)
+        self.log.debug('wai thread seems finished, loop broken')
 
     def start_auth(self):
         self.log.debug("starting auth thread")
@@ -151,14 +156,26 @@ class StupidNode:
         self.log.info("publishing message: %s", msg)
         self.pub.send(msg)
 
-    def callback(self, socket):
-        cb = self._callbacks.get(socket.type, default_callback)
+    def callback(self, socket_or_key):
+        if isinstance(socket_or_key, int):
+            key = socket_or_key
+            cbg = self._callbacks.get(key)
+            if cbg is None:
+                raise Exception(f'no registered callback under key={key!r}; cannot guess applicable socket to use')
+            cb, socket = cbg
+            socket = socket()
+            if socket is None:
+                raise Exception(f'unable to find socket for key={key!r}')
+        else:
+            socket = socket_or_key
+            key = compute_callback_key(socket)
+            # key could be a fileno or the id of a CallOnEachFactory, do not use fileno() directly
+            cb, *_ = self._callbacks.get(key, (default_callback,))
         return cb(socket)
 
     def set_callback(self, socket, callback):
-        if isinstance(socket, CallOnEachFactory):
-            socket, *_ = socket.values()
-        self._callbacks[socket.type] = callback
+        key = compute_callback_key(socket)
+        self._callbacks[key] = (callback, weakref.ref(socket))
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -203,7 +220,6 @@ class StupidNode:
         for item in items:
             if items[item] != zmq.POLLIN:
                 continue
-            zmq_socket_type_name(item.type)
             ret.append(self.callback(item))
         return ret
 
@@ -213,11 +229,18 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
+        for i in ('auth', 'ctx'):
+            if not  hasattr(self, i):
+                self.log.debug('already closekilled, skipping extra closekill invocation')
+                return
+
         self.log.debug("closekilling")
+
         try:
             self.log.debug("trying to stop auth thread")
             self.auth.stop()
             self.log.debug("auth thread seems to have stopped")
+            del self.auth
         except AttributeError:
             self.log.debug("there does not seem to be an auth thread to stop")
 
@@ -226,13 +249,15 @@ class StupidNode:
             self._wai_continue = False
             self._wai_thread.join()
             self.log.debug("WAI Thread seems to jave joined us.")
-            self._wai_thread = None
+            del self._wai_thread
 
         self.log.debug("destroying cleartext context")
         self.cleartext_ctx.destroy(1)
+        del self.cleartext_ctx
 
         self.log.debug("destroying crypto context")
         self.ctx.destroy(1)
+        del self.ctx
 
     def __del__(self):
         self.closekill()

@@ -158,7 +158,7 @@ class StupidNode:
 
     def set_callback(self, sock, callback):
         if sock in (self.sub, self.push):
-            self.log.debug("<set-callback [loop]> on %s", key, self)
+            self.log.debug("<set-callback [loop]> on %s", self)
             for item in sock:
                 self.set_callback(item, callback)
             return

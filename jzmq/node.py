@@ -59,29 +59,6 @@ class StupidNode:
         self.router = self.mk_socket(zmq.ROUTER)
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
-        def my_raise(e, f=None):
-            if f:
-                raise e from f
-            raise e
-
-        sock_type = type(self.pub)
-
-        def vc(new, old):
-            if not isinstance(new, sock_type):
-                raise TypeError(
-                    f"this call factory must contain all {sock_type} values"
-                )
-            if old is not None and new.type != old.type:
-                raise ValueError(
-                    f"this call factory must contain only {zmq_socket_type_name(old.type)} sockets"
-                )
-
-        def kc(new, from_=None):
-            if not isinstance(new, Endpoint):
-                my_raise(
-                    TypeError("All keys to this call factory must be Endpoints"), from_
-                )
-
         self.sub = list()
         self.push = list()
 
@@ -166,26 +143,28 @@ class StupidNode:
             key = sock_or_key
             cbe = self._callbacks.get(key)
             if cbe is None:
-                raise Exception(f"no registered callback under key={key!r}; cannot guess applicable socket to use")
-            cb,sock = cbe
+                raise Exception(
+                    f"no registered callback under key={key!r}; cannot guess applicable socket to use"
+                )
+            cb, sock = cbe
             sock = sock()
             if not sock:
                 raise Exception(f"unable to find socket for key={key!r}")
         else:
             sock = sock_or_key
             key = sock.fileno()
-            cb,_ = self._callbacks.get(key, (default_callback,None))
+            cb, _ = self._callbacks.get(key, (default_callback, None))
         return cb(sock)
 
     def set_callback(self, sock, callback):
         if sock in (self.sub, self.push):
-            self.log.debug('<set-callback [loop]> on %s', key, self)
+            self.log.debug("<set-callback [loop]> on %s", key, self)
             for item in sock:
                 self.set_callback(item, callback)
             return
 
         key = sock.fileno()
-        self.log.debug('<set-callback [%d]> on %s', key, self)
+        self.log.debug("<set-callback [%d]> on %s", key, self)
         self._callbacks[key] = (callback, weakref.ref(sock))
 
     def mk_socket(self, stype, enable_curve=True):

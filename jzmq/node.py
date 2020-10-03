@@ -4,32 +4,25 @@ import os
 import sys, signal
 import re
 import logging
+import time
 from threading import Thread
 from socket import gethostname
-import weakref
 
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
+from .msg import TaggedMessage
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
+log = logging.getLogger(__name__)
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
-
-
-def default_callback(socket):
-    msg = socket.recv()
-    to_print = f"<default_callback:{zmq_socket_type_name(socket.type)}>({msg})"
-    log = logging.getLogger(__name__)
-    log.info(to_print)
-    print(to_print)
-
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -74,28 +67,27 @@ class StupidNode:
         self.poller = zmq.Poller()
         self.poller.register(self.pull, zmq.POLLIN)
 
-        self._callbacks = dict()
-
         self.log.debug("configuring interrupt signal")
         signal.signal(signal.SIGINT, self.interrupt)
 
         self.log.debug("configuring WAI Reply Thread")
-        self._wai_thread = Thread(target=self.wai_reply_machine, args=(self.rep,))
+        self._wai_thread = Thread(target=self.wai_reply_machine)
         self._wai_continue = True
         self._wai_thread.start()
 
         self.log.debug("node setup complete")
+        self.recent = dict()
 
-    def wai_reply_machine(self, socket):
+    def wai_reply_machine(self):
         while self._wai_continue:
-            if socket.poll(200):
+            if self.rep.poll(200):
                 self.log.debug("wai polled, trying to recv")
-                msg = socket.recv()
-                ttype = zmq_socket_type_name(socket.type)
+                msg = self.rep.recv()
+                ttype = zmq_socket_type_name(self.rep)
                 self.log.debug('receved "%s" over %s socket', msg, ttype)
                 msg = [self.identity.encode(), self.pubkey]
                 self.log.debug('sending "%s" as reply over %s socket', msg, ttype)
-                socket.send_multipart(msg)
+                self.rep.send_multipart(msg)
         self.log.debug("wai thread seems finished, loop broken")
 
     def start_auth(self):
@@ -138,35 +130,6 @@ class StupidNode:
         self.log.info("publishing message: %s", msg)
         self.pub.send(msg)
 
-    def callback(self, sock_or_key):
-        if isinstance(sock_or_key, int):
-            key = sock_or_key
-            cbe = self._callbacks.get(key)
-            if cbe is None:
-                raise Exception(
-                    f"no registered callback under key={key!r}; cannot guess applicable socket to use"
-                )
-            cb, sock = cbe
-            sock = sock()
-            if not sock:
-                raise Exception(f"unable to find socket for key={key!r}")
-        else:
-            sock = sock_or_key
-            key = sock.fileno()
-            cb, _ = self._callbacks.get(key, (default_callback, None))
-        return cb(sock)
-
-    def set_callback(self, sock, callback):
-        if sock in (self.sub, self.push):
-            self.log.debug("<set-callback [loop]> on %s", self)
-            for item in sock:
-                self.set_callback(item, callback)
-            return
-
-        key = sock.fileno()
-        self.log.debug("<set-callback [%d]> on %s", key, self)
-        self._callbacks[key] = (callback, weakref.ref(sock))
-
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
         # socket.setsockopt(zmq.LINGER, -1) # infinite
@@ -204,13 +167,43 @@ class StupidNode:
 
         return socket
 
+    def sub_receive(self, socket):
+        return TaggedMessage(*socket.recv_multipart())
+
+    def sub_workflow(self, socket):
+        log.debug('start sub_workflow')
+        msg = self.sub_receive(socket)
+        msg = self.sub_react(msg)
+        log.debug('end sub_workflow')
+        return msg
+
+    def pull_workflow(self, socket):
+        log.debug('start pull_workflow')
+        msg = self.pull_receive()
+        msg = self.pull_react(msg)
+        log.debug('end pull_workflow')
+        return msg
+
+    def react(self, msg):
+        self.log.info(f"default reaction to message: %s", msg)
+        return msg
+
+    pull_react = sub_react = react
+
     def poll(self, timeo=500):
         items = dict(self.poller.poll(timeo))
         ret = list()
         for item in items:
             if items[item] != zmq.POLLIN:
                 continue
-            ret.append(self.callback(item))
+            if item in self.sub:
+                res = self.sub_workflow(item)
+            elif item is self.pull:
+                res = self.pull_workflow()
+            else:
+                log.error('no workflow defined for socket of type %s', zmq_socket_type_name(item))
+            if res is not None:
+                ret.append(res)
         return ret
 
     def interrupt(self, signo, eframe):  # pylint: disable=unused-argument
@@ -252,6 +245,7 @@ class StupidNode:
         del self.ctx
 
     def __del__(self):
+        log.debug("%s is being deleted", self)
         self.closekill()
 
     def bind(self, socket, enable_curve=True):

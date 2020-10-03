@@ -53,6 +53,9 @@ class TaggedMessage(StupidMessage):
 
         self._tag = (self._tag[0], float(self._tag[1]))
 
+    def __eq__(self, other):
+        return self.msg == other
+
     def __str__(self):
         return self.msg
 

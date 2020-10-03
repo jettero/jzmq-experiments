@@ -203,7 +203,7 @@ class StupidNode:
                 res = self.pull_workflow()
             else:
                 log.error('no workflow defined for socket of type %s', zmq_socket_type_name(item))
-            if res is not None:
+            if isinstance(res, TaggedMessage):
                 ret.append(res)
         return ret
 

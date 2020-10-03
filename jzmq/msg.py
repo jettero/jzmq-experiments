@@ -2,10 +2,11 @@
 # coding: utf-8
 
 import re
+import logging
 from time import time as now
 from collections import namedtuple
 
-TAG_RE = re.compile(r'<(?P<name>.+?):(?P<time>\d+(?:\.\d+)?)>')
+TAG_RE = re.compile(r'<(.+?):(\d+|\d+\.\d+)>')
 
 def decode_part(x):
     if isinstance(x, (int,float)):
@@ -13,11 +14,6 @@ def decode_part(x):
 
     try:
         x = x.decode()
-    except AttributeError:
-        pass
-
-    try:
-        x = x.strip()
     except AttributeError:
         pass
 
@@ -67,11 +63,15 @@ class TaggedMessage(StupidMessage):
         if len(self) < 1:
             self.tag = Tag('unknown')
         else:
-            m = TAG_RE.match(self[0])
-            if m:
-                self.tag = Tag(m.group(1), time=m.group(2))
+            if isinstance(self[0], Tag):
+                self.tag = Tag(self[0].name, self[1].time)
             else:
-                self.tag = Tag('unknown')
+                m = TAG_RE.match(self[0])
+                if m:
+                    self.pop(0)
+                    self.tag = Tag(m.group(1), m.group(2))
+                else:
+                    self.tag = Tag('unknown')
 
     def __eq__(self, other):
         return self.msg == other

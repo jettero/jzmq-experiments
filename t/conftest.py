@@ -21,8 +21,8 @@ def tarch_desc():
 
 
 @pytest.fixture(scope="function")
-def tarch(tarch_desc):
-    Nodes = namedtuple("Nodes", sorted(tarch_desc))
+def tarch(tarch_desc, tarch_names):
+    Nodes = namedtuple("Nodes", tarch_names)
 
     log.info("created tarch nodes")
     nodes = Nodes(*t.arch.generate_nodes(tarch_desc))
@@ -33,6 +33,10 @@ def tarch(tarch_desc):
     log.info("destroying tarch nodes")
     for node in nodes:
         node.closekill()
+
+@pytest.fixture(scope='session')
+def tarch_names(tarch_desc):
+    return tuple(sorted(tarch_desc))
 
 
 def pytest_addoption(parser):

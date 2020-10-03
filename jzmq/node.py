@@ -76,7 +76,6 @@ class StupidNode:
         self._wai_thread.start()
 
         self.log.debug("node setup complete")
-        self.recent = dict()
 
     def wai_reply_machine(self):
         while self._wai_continue:
@@ -125,10 +124,10 @@ class StupidNode:
             self.load_key()
 
     def publish_message(self, msg):
-        if not isinstance(msg, (bytes, bytearray)):
-            msg = msg.encode()
         self.log.info("publishing message: %s", msg)
-        self.pub.send(msg)
+        if not isinstance(msg, TaggedMessage):
+            msg = TaggedMessage(msg)
+        self.pub.send_multipart(msg.encode())
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -184,11 +183,13 @@ class StupidNode:
         log.debug('end pull_workflow')
         return msg
 
-    def react(self, msg):
-        self.log.info(f"default reaction to message: %s", msg)
+    def sub_react(self, msg):
+        self.log.info(f"default sub-reaction to message: %s", msg)
         return msg
 
-    pull_react = sub_react = react
+    def pull_react(self, msg):
+        self.log.info(f"default pull-reaction to message: %s", msg)
+        return msg
 
     def poll(self, timeo=500):
         items = dict(self.poller.poll(timeo))
@@ -345,3 +346,26 @@ class StupidNode:
 
     def __repr__(self):
         return f"StupidNode({self.identity})"
+
+
+class RelayNode(StupidNode):
+    def __init__(self, *a, dup_time=10, **kw):
+        super().__init__(*a, **kw)
+        self.recent = set()
+        self.dup_time = dup_time
+
+    def _cleanup_recent(self):
+        old = time.time() - self.dup_time
+        self.recent = set( x for x in self.recent if x.time > old )
+
+    def sub_react(self, msg):
+        self._cleanup_recent()
+        if msg.tag in self.recent:
+            log.debug("%s is too old to react to", repr(msg))
+            return False
+        log.debug("relaying %s to subscribers", repr(msg))
+        self.publish_message(msg)
+        self.recent.add(msg.tag)
+        return msg
+
+    pull_react = sub_react

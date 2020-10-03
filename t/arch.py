@@ -5,19 +5,19 @@ import re
 import logging
 import socket
 from collections import namedtuple
-from jzmq import StupidNode
+from jzmq import Node
 from jzmq.util import zmq_socket_type_name
 
 log = logging.getLogger(__name__)
 
 TEST_PORT = 5555
 TARCH_NODE_COUNT = 7  # there's actually only 4 in NOTES.txt, leave some space
-TEST_PORT_INCREMENT = TARCH_NODE_COUNT * StupidNode.PORTS
+TEST_PORT_INCREMENT = TARCH_NODE_COUNT * Node.PORTS
 FIND_PORT_MAX_TRIES = 7
 
 
-def _check_ports(port, count=StupidNode.PORTS):
-    prange = (port, port + StupidNode.PORTS)
+def _check_ports(port, count=Node.PORTS):
+    prange = (port, port + Node.PORTS)
     for _ in range(port, port + count):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,7 +43,7 @@ def _check_ports(port, count=StupidNode.PORTS):
 def _get_port(
     start=TEST_PORT,
     increment=TEST_PORT_INCREMENT,
-    count=StupidNode.PORTS,
+    count=Node.PORTS,
     max_tries=FIND_PORT_MAX_TRIES,
 ):
     ostart = start
@@ -91,29 +91,12 @@ def generate_nodes(tarch_desc):
         raddrs = tuple(tarch_desc[n].raddr for n in endpn)
         rids = tuple(tarch_desc[n].ident for n in endpn)
         log.info("creating %s → %s", tn.ident, ", ".join(rids))
-        sn = StupidNode(tn.laddr, identity=tn.ident, keyring="t/test-keyring")
-        tmp.append((sn, raddrs))
-
-    def set_callback_and_bind_list(node):
-        node.received_messages = msgs = list()
-
-        def the_callback(sock):
-            msg = sock.recv().decode().rstrip()
-            log.info(
-                "node=%s; <conftest:the_callback:%s>(%s)",
-                node,
-                zmq_socket_type_name(sock.type),
-                msg,
-            )
-            msgs.append(msg)
-
-        for s in (node.sub, node.pull):
-            node.set_callback(s, the_callback)
+        rn = Node(tn.laddr, identity=tn.ident, keyring="t/test-keyring")
+        tmp.append((rn, raddrs))
 
     for node, raddrs in tmp:
         log.info("connecting %s to endpoints=%s", node, raddrs)
         node.connect_to_endpoints(*raddrs)
-        set_callback_and_bind_list(node)
 
     return [x for x, _ in tmp]
 

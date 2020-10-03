@@ -2,14 +2,13 @@
 # coding: utf-8
 
 import re
-import logging
 from time import time as now
-from collections import namedtuple
 
-TAG_RE = re.compile(r'<(.+?):(\d+|\d+\.\d+)>')
+TAG_RE = re.compile(r"<(.+?):(\d+|\d+\.\d+)>")
+
 
 def decode_part(x):
-    if isinstance(x, (int,float)):
+    if isinstance(x, (int, float)):
         x = str(x)
 
     try:
@@ -22,17 +21,20 @@ def decode_part(x):
 
 class StupidMessage(list):
     def __init__(self, *parts):
-        super().__init__( decode_part(x) for x in parts )
+        super().__init__(decode_part(x) for x in parts)
 
     def encode(self, *a, prefix=None, **kw):
         if prefix is None:
             prefix = tuple()
         if not isinstance(prefix, (tuple, list)):
             prefix = (prefix,)
-        return tuple( x.encode(*a, **kw) for x in prefix ) + tuple( x.encode(*a, **kw) for x in self )
+        return tuple(x.encode(*a, **kw) for x in prefix) + tuple(
+            x.encode(*a, **kw) for x in self
+        )
 
     def __repr__(self):
-        return f'StupidMessage{tuple(self)}'
+        return f"StupidMessage{tuple(self)}"
+
 
 class Tag:
     def __init__(self, name, time=None):
@@ -43,7 +45,7 @@ class Tag:
             self.time = now()
 
     def __str__(self):
-        return f'<{self.name}:{self.time}>'
+        return f"<{self.name}:{self.time}>"
 
     def encode(self, *a, **kw):
         return self.__str__().encode(*a, **kw)
@@ -57,14 +59,15 @@ class Tag:
     def __hash__(self):
         return (self.name, self.time).__hash__()
 
+
 class TaggedMessage(StupidMessage):
-    def __init__(self, *parts, sep=' '):
+    def __init__(self, *parts, sep=" "):
         super().__init__(*parts)
 
         self.sep = sep
 
         if len(self) < 1:
-            self.tag = Tag('unknown')
+            self.tag = Tag("unknown")
         else:
             if isinstance(self[0], Tag):
                 self.tag = Tag(self[0].name, self[1].time)
@@ -74,7 +77,7 @@ class TaggedMessage(StupidMessage):
                     self.pop(0)
                     self.tag = Tag(m.group(1), m.group(2))
                 else:
-                    self.tag = Tag('unknown')
+                    self.tag = Tag("unknown")
 
     def __eq__(self, other):
         return self.msg == other
@@ -83,7 +86,7 @@ class TaggedMessage(StupidMessage):
         return self.msg
 
     def __repr__(self):
-        return f'TaggedMessage[{self.tag}]{tuple(self)}'
+        return f"TaggedMessage[{self.tag}]{tuple(self)}"
 
     def encode(self, *a, **kw):
         return super().encode(*a, prefix=self.tag, **kw)

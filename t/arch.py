@@ -6,7 +6,6 @@ import logging
 import socket
 from collections import namedtuple
 from jzmq import Node
-from jzmq.util import zmq_socket_type_name
 
 log = logging.getLogger(__name__)
 

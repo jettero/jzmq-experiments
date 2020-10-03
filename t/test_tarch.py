@@ -22,7 +22,7 @@ def test_tarch_construction(tarch, tarch_names):
         assert isinstance(item, Node)
 
     assert len(tarch_names) == len(tarch)
-    for k,item in zip(tarch_names, tarch):
+    for k, item in zip(tarch_names, tarch):
         assert item is getattr(tarch, k)
 
 
@@ -35,7 +35,7 @@ def test_tarch_msgs_AB(tarch):
         item.received_messages = item.poll(50)
 
     expected_res = [test_msg]
-    assert [str(x) for x in tarch.A.received_messages ] == expected_res
-    assert [str(x) for x in tarch.B.received_messages ] == list()
-    assert [str(x) for x in tarch.C.received_messages ] == expected_res
-    assert [str(x) for x in tarch.D.received_messages ] == expected_res
+    assert [str(x) for x in tarch.A.received_messages] == expected_res
+    assert [str(x) for x in tarch.B.received_messages] == list()
+    assert [str(x) for x in tarch.C.received_messages] == expected_res
+    assert [str(x) for x in tarch.D.received_messages] == expected_res

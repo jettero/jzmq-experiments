@@ -34,7 +34,8 @@ def tarch(tarch_desc, tarch_names):
     for node in nodes:
         node.closekill()
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def tarch_names(tarch_desc):
     return tuple(sorted(tarch_desc))
 

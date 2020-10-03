@@ -19,10 +19,12 @@ DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyri
 
 log = logging.getLogger(__name__)
 
+
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
+
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -169,26 +171,29 @@ class StupidNode:
     def sub_receive(self, socket):
         return TaggedMessage(*socket.recv_multipart())
 
+    def pull_receive(self):
+        return TaggedMessage(*self.pull.recv_multipart())
+
     def sub_workflow(self, socket):
-        log.debug('start sub_workflow')
+        log.debug("start sub_workflow")
         msg = self.sub_receive(socket)
         msg = self.sub_react(msg)
-        log.debug('end sub_workflow')
+        log.debug("end sub_workflow")
         return msg
 
-    def pull_workflow(self, socket):
-        log.debug('start pull_workflow')
+    def pull_workflow(self):
+        log.debug("start pull_workflow")
         msg = self.pull_receive()
         msg = self.pull_react(msg)
-        log.debug('end pull_workflow')
+        log.debug("end pull_workflow")
         return msg
 
     def sub_react(self, msg):
-        self.log.info(f"default sub-reaction to message: %s", msg)
+        self.log.info("default sub-reaction to message: %s", msg)
         return msg
 
     def pull_react(self, msg):
-        self.log.info(f"default pull-reaction to message: %s", msg)
+        self.log.info("default pull-reaction to message: %s", msg)
         return msg
 
     def poll(self, timeo=500):
@@ -202,7 +207,10 @@ class StupidNode:
             elif item is self.pull:
                 res = self.pull_workflow()
             else:
-                log.error('no workflow defined for socket of type %s', zmq_socket_type_name(item))
+                log.error(
+                    "no workflow defined for socket of type %s",
+                    zmq_socket_type_name(item),
+                )
             if isinstance(res, TaggedMessage):
                 ret.append(res)
         return ret
@@ -356,7 +364,7 @@ class RelayNode(StupidNode):
 
     def _cleanup_recent(self):
         old = time.time() - self.dup_time
-        self.recent = set( x for x in self.recent if x.time > old )
+        self.recent = set(x for x in self.recent if x.time > old)
 
     def sub_react(self, msg):
         self._cleanup_recent()

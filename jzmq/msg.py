@@ -54,6 +54,9 @@ class Tag:
         if isinstance(other, self.__class__):
             return self.name == other.name and self.time == other.time
 
+    def __hash__(self):
+        return (self.name, self.time).__hash__()
+
 class TaggedMessage(StupidMessage):
     def __init__(self, *parts, sep=' '):
         super().__init__(*parts)

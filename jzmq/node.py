@@ -125,7 +125,7 @@ class StupidNode:
 
     def publish_message(self, msg, no_push=False, no_push_to=None):
         if not isinstance(msg, TaggedMessage):
-            msg = TaggedMessage(msg)
+            msg = TaggedMessage(msg, name=self.identity)
         rmsg = repr(msg)
         e_msg = msg.encode()
         self.log.debug("publishing message %s", rmsg)

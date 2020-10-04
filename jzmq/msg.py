@@ -61,13 +61,13 @@ class Tag:
 
 
 class TaggedMessage(StupidMessage):
-    def __init__(self, *parts, sep=" "):
+    def __init__(self, *parts, sep=" ", name="unknown"):
         super().__init__(*parts)
 
         self.sep = sep
 
         if len(self) < 1:
-            self.tag = Tag("unknown")
+            self.tag = Tag(name)
         else:
             if isinstance(self[0], Tag):
                 self.tag = Tag(self[0].name, self[1].time)
@@ -77,7 +77,7 @@ class TaggedMessage(StupidMessage):
                     self.pop(0)
                     self.tag = Tag(m.group(1), m.group(2))
                 else:
-                    self.tag = Tag("unknown")
+                    self.tag = Tag(name)
 
     def __eq__(self, other):
         return self.msg == other

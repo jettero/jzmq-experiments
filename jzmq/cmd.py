@@ -5,15 +5,7 @@ import sys
 import logging
 import click
 import zmq
-from .node import StupidNode, DEFAULT_KEYRING
-
-to_send = list()
-
-
-def read_a_line(socket):
-    line = socket.readline().rstrip()
-    to_send.append(line)
-
+from .node import RelayNode as Node, DEFAULT_KEYRING
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
@@ -30,18 +22,27 @@ def chat(laddr, raddr, identity, verbosity, keyring):  # pylint: disable=unused-
         log_level = logging.INFO
         if verbosity > 1:
             log_level = logging.DEBUG
+        if verbosity < 4:
+            logging.getLogger('zmq.auth').propagate = False
 
     logging.basicConfig(level=log_level)
+    log = logging.getLogger('jzmq.chat')
 
-    sn = StupidNode(laddr, identity=identity, keyring=keyring).connect_to_endpoints(
-        *raddr
-    )
+    sn = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
     sn.poller.register(sys.stdin, zmq.POLLIN)
-    sn.set_callback(sys.stdin, read_a_line)
+
+    ssinfno = sys.stdin.fileno()
+    to_send = list()
+    def read_a_line(sock):
+        # normally the poller hands us our fileno, not the socket, so sock=0 is
+        # the expected arg for sys.stdin
+        if sock in (ssinfno, sys.stdin):
+            line = sys.stdin.readline().rstrip()
+            to_send.append(line)
 
     while True:
-        # poll() returns a list of return values from the callbacks
-        _ = sn.poll(50 if to_send else 500)  # we ignore it for now
-
-        if to_send:
+        msgs = sn.poll(50, other_cb=read_a_line)
+        for msg in msgs:
+            print(f'{msg.name}: {msg.msg}')
+        while to_send:
             sn.publish_message(to_send.pop(0))

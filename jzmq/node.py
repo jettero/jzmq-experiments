@@ -379,7 +379,7 @@ class StupidNode:
         return self
 
     def __repr__(self):
-        return f"StupidNode({self.identity})"
+        return f"{self.__class__.__name__}({self.identity})"
 
 
 class RelayNode(StupidNode):

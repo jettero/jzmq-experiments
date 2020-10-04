@@ -83,7 +83,7 @@ class StupidNode:
                 self.log.debug("wai polled, trying to recv")
                 msg = self.rep.recv()
                 ttype = zmq_socket_type_name(self.rep)
-                self.log.debug('receved "%s" over %s socket', msg, ttype)
+                self.log.debug('received "%s" over %s socket', msg, ttype)
                 msg = [self.identity.encode(), self.pubkey]
                 self.log.debug('sending "%s" as reply over %s socket', msg, ttype)
                 self.rep.send_multipart(msg)

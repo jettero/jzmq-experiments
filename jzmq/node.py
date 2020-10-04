@@ -29,7 +29,6 @@ def scrub_identity_name_for_certfile(x):
 class StupidNode:
     pubkey = privkey = auth = None
     channel = ""  # subscription filter or something (I think)
-
     PORTS = 4  # as we add or remove ports, make sure this is the number of ports a StupidNode uses
 
     def __init__(self, endpoint="*", identity=None, keyring=DEFAULT_KEYRING):
@@ -37,8 +36,9 @@ class StupidNode:
         self.endpoint = (
             endpoint if isinstance(endpoint, Endpoint) else Endpoint(endpoint)
         )
+        self.endpoints = list()
         self.identity = identity or f"{gethostname()}-{self.endpoint.pub}"
-        self.log = logging.getLogger(f"SN({self.identity})")
+        self.log = logging.getLogger(f"{self.identity}")
 
         self.log.debug("begin node setup / creating context")
 
@@ -125,11 +125,32 @@ class StupidNode:
             zmq.auth.create_certificates(self.keyring, self.key_basename)
             self.load_key()
 
-    def publish_message(self, msg):
-        self.log.info("publishing message: %s", msg)
+    def publish_message(self, msg, no_push=False, no_push_to=None):
         if not isinstance(msg, TaggedMessage):
             msg = TaggedMessage(msg)
-        self.pub.send_multipart(msg.encode())
+        rmsg = repr(msg)
+        e_msg = msg.encode()
+        self.log.info("publishing message %s", rmsg)
+        self.pub.send_multipart(e_msg)
+        if no_push:
+            return
+        if no_push_to is None:
+            ok_send = lambda x: True
+        elif callable(no_push_to):
+            ok_send = no_push_to
+        elif isinstance(no_push_to, self.pull.__class__):
+            npt_i = self.push.index(no_push_to)
+            ok_send = lambda x: x != npt_i
+        elif isinstance(no_push_to, int):
+            ok_send = lambda x: x != no_push_to
+        elif isinstance(no_push_to, (list,tuple)):
+            ok_send = lambda x: x not in no_push_to
+        for i,sock in enumerate(self.push):
+            if ok_send(i):
+                self.log.info("pushing message %s to %s", rmsg, self.endpoints[i])
+                sock.send_multipart(e_msg)
+            else:
+                self.log.info("not sending %s to %s", rmsg, self.endpoints[i])
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -168,16 +189,12 @@ class StupidNode:
 
         return socket
 
-    def sub_receive(self, socket):
-        return TaggedMessage(*socket.recv_multipart())
-
-    def pull_receive(self):
-        return TaggedMessage(*self.pull.recv_multipart())
-
     def sub_workflow(self, socket):
-        log.debug("start sub_workflow")
-        msg = self.sub_receive(socket)
-        msg = self.sub_react(msg)
+        idx = self.sub.index(socket)
+        enp = self.endpoints[idx]
+        log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
+        msg = self.sub_receive(socket, idx)
+        msg = self.sub_react(msg, idx)
         log.debug("end sub_workflow")
         return msg
 
@@ -188,12 +205,18 @@ class StupidNode:
         log.debug("end pull_workflow")
         return msg
 
-    def sub_react(self, msg):
-        self.log.info("default sub-reaction to message: %s", msg)
+    def sub_receive(self, socket, idx):
+        return TaggedMessage(*socket.recv_multipart())
+
+    def pull_receive(self):
+        return TaggedMessage(*self.pull.recv_multipart())
+
+    def sub_react(self, msg, idx):
+        self.log.info("sub_react(%s, %d -> %s)", repr(msg), idx, self.endpoints[idx])
         return msg
 
     def pull_react(self, msg):
-        self.log.info("default pull-reaction to message: %s", msg)
+        self.log.info("pull_react(%s)", repr(msg))
         return msg
 
     def poll(self, timeo=500):
@@ -296,6 +319,7 @@ class StupidNode:
             )
             node_id, public_key = self.cleartext_request(endpoint, "who are you?")
             if node_id:
+                endpoint.identity = node_id.decode()
                 epubk_pname = self.pubkey_pathname(node_id)
                 if not os.path.isfile(epubk_pname):
                     with open(epubk_pname, "wb") as fh:
@@ -350,6 +374,8 @@ class StupidNode:
         psh = self._create_connected_socket(endpoint, zmq.PUSH, epk)
         self.push.append(psh)
 
+        self.endpoints.append(endpoint)
+
         return self
 
     def __repr__(self):
@@ -366,14 +392,27 @@ class RelayNode(StupidNode):
         old = time.time() - self.dup_time
         self.recent = set(x for x in self.recent if x.time > old)
 
-    def sub_react(self, msg):
+    def _is_repeat(self, msg):
         self._cleanup_recent()
         if msg.tag in self.recent:
-            log.debug("%s is too old to react to", repr(msg))
-            return False
-        log.debug("relaying %s to subscribers", repr(msg))
-        self.publish_message(msg)
+            log.info("%s may be a repeat, not (re)broadcasting", repr(msg))
+            return True
         self.recent.add(msg.tag)
+        log.info("marking having seen %s, check_msg ok", msg.tag)
+        return False
+
+    def sub_react(self, msg, idx):
+        msg = super().sub_react(msg, idx)
+        if self._is_repeat(msg):
+            return False
+        log.info("continuing with reaction to %s", repr(msg))
+        self.publish_message(msg, no_push_to=idx)
         return msg
 
-    pull_react = sub_react
+    def pull_react(self, msg):
+        msg = super().pull_react(msg)
+        if self._is_repeat(msg):
+            return False
+        log.info("continuing with reaction to %s", repr(msg))
+        self.publish_message(msg)
+        return msg

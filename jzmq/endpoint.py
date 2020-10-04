@@ -63,7 +63,7 @@ class Endpoint:
     }
     _xlate_aton = dict((v, k) for k, v in _xlate_ntoa.items())
 
-    def __init__(self, description):
+    def __init__(self, description, identity=None):
         for slurpizer in _slurpies:
             if slurpizer.match(description):
 
@@ -87,8 +87,11 @@ class Endpoint:
                 proto = slurpizer["proto"]
                 if proto:
                     self.proto = proto
+        self.identity = identity
 
     def __repr__(self):
+        if self.identity is not None:
+            return str(self.identity)
         return f"{self.host}:[pub={self.pub} pull={self.pull} router={self.router}]"
 
     def port(self, ptype=zmq.PUB):

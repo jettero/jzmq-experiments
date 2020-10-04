@@ -21,3 +21,4 @@
       TEST_ARCH    B → C, B → D
       TEST_ARCH    C → A, C → D
       TEST_ARCH    D → A, D → B
+      TEST_ARCH    E → C

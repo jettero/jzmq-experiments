@@ -217,7 +217,7 @@ class StupidNode:
         self.log.debug("pull_react(%r)", msg)
         return msg
 
-    def poll(self, timeo=500):
+    def poll(self, timeo=500, other_cb=None):
         items = dict(self.poller.poll(timeo))
         ret = list()
         for item in items:
@@ -227,6 +227,8 @@ class StupidNode:
                 res = self.sub_workflow(item)
             elif item is self.pull:
                 res = self.pull_workflow()
+            elif callable(other_cb):
+                res = other_cb(item)
             else:
                 self.log.error(
                     "no workflow defined for socket of type %s",

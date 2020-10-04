@@ -17,14 +17,10 @@ from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
-log = logging.getLogger(__name__)
-
-
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
-
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -130,7 +126,7 @@ class StupidNode:
             msg = TaggedMessage(msg)
         rmsg = repr(msg)
         e_msg = msg.encode()
-        self.log.info("publishing message %s", rmsg)
+        self.log.debug("publishing message %s", rmsg)
         self.pub.send_multipart(e_msg)
         if no_push:
             return
@@ -147,10 +143,10 @@ class StupidNode:
             ok_send = lambda x: x not in no_push_to
         for i,sock in enumerate(self.push):
             if ok_send(i):
-                self.log.info("pushing message %s to %s", rmsg, self.endpoints[i])
+                self.log.debug("pushing message %s to %s", rmsg, self.endpoints[i])
                 sock.send_multipart(e_msg)
             else:
-                self.log.info("not sending %s to %s", rmsg, self.endpoints[i])
+                self.log.debug("not sending %s to %s", rmsg, self.endpoints[i])
 
     def mk_socket(self, stype, enable_curve=True):
         # defaults:
@@ -192,17 +188,17 @@ class StupidNode:
     def sub_workflow(self, socket):
         idx = self.sub.index(socket)
         enp = self.endpoints[idx]
-        log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
+        self.log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.sub_receive(socket, idx)
         msg = self.sub_react(msg, idx)
-        log.debug("end sub_workflow")
+        self.log.debug("end sub_workflow")
         return msg
 
     def pull_workflow(self):
-        log.debug("start pull_workflow")
+        self.log.debug("start pull_workflow")
         msg = self.pull_receive()
         msg = self.pull_react(msg)
-        log.debug("end pull_workflow")
+        self.log.debug("end pull_workflow")
         return msg
 
     def sub_receive(self, socket, idx):
@@ -212,11 +208,11 @@ class StupidNode:
         return TaggedMessage(*self.pull.recv_multipart())
 
     def sub_react(self, msg, idx):
-        self.log.info("sub_react(%s, %d -> %s)", repr(msg), idx, self.endpoints[idx])
+        self.log.debug("sub_react(%r, %d -> %s)", msg, idx, self.endpoints[idx])
         return msg
 
     def pull_react(self, msg):
-        self.log.info("pull_react(%s)", repr(msg))
+        self.log.debug("pull_react(%r)", msg)
         return msg
 
     def poll(self, timeo=500):
@@ -230,7 +226,7 @@ class StupidNode:
             elif item is self.pull:
                 res = self.pull_workflow()
             else:
-                log.error(
+                self.log.error(
                     "no workflow defined for socket of type %s",
                     zmq_socket_type_name(item),
                 )
@@ -277,7 +273,7 @@ class StupidNode:
         del self.ctx
 
     def __del__(self):
-        log.debug("%s is being deleted", self)
+        self.log.debug("%s is being deleted", self)
         self.closekill()
 
     def bind(self, socket, enable_curve=True):
@@ -395,17 +391,16 @@ class RelayNode(StupidNode):
     def _is_repeat(self, msg):
         self._cleanup_recent()
         if msg.tag in self.recent:
-            log.info("%s may be a repeat, not (re)broadcasting", repr(msg))
+            self.log.debug("%r may be a repeat, not (re)broadcasting", msg)
             return True
+        self.log.debug("marking having seen %s, check_msg ok though", msg.tag)
         self.recent.add(msg.tag)
-        log.info("marking having seen %s, check_msg ok", msg.tag)
         return False
 
     def sub_react(self, msg, idx):
         msg = super().sub_react(msg, idx)
         if self._is_repeat(msg):
             return False
-        log.info("continuing with reaction to %s", repr(msg))
         self.publish_message(msg, no_push_to=idx)
         return msg
 
@@ -413,6 +408,5 @@ class RelayNode(StupidNode):
         msg = super().pull_react(msg)
         if self._is_repeat(msg):
             return False
-        log.info("continuing with reaction to %s", repr(msg))
         self.publish_message(msg)
         return msg

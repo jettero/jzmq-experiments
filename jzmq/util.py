@@ -44,6 +44,8 @@ ZMQ_SOCKET_TYPE_NAMES = (
 
 
 def zmq_socket_type_name(socket_type_number):
+    if isinstance(socket_type_number, zmq.Socket):
+        socket_type_number = socket_type_number.type
     for item in ZMQ_SOCKET_TYPE_NAMES:
         try:
             if socket_type_number == getattr(zmq, item):

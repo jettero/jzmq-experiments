@@ -17,10 +17,12 @@ from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
 
+
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
         x = x.decode()
     return re.sub(r"[^\w\d_-]+", "_", x)
+
 
 class StupidNode:
     pubkey = privkey = auth = None
@@ -139,9 +141,9 @@ class StupidNode:
             ok_send = lambda x: x != npt_i
         elif isinstance(no_push_to, int):
             ok_send = lambda x: x != no_push_to
-        elif isinstance(no_push_to, (list,tuple)):
+        elif isinstance(no_push_to, (list, tuple)):
             ok_send = lambda x: x not in no_push_to
-        for i,sock in enumerate(self.push):
+        for i, sock in enumerate(self.push):
             if ok_send(i):
                 self.log.debug("pushing message %s to %s", rmsg, self.endpoints[i])
                 sock.send_multipart(e_msg)
@@ -201,7 +203,7 @@ class StupidNode:
         self.log.debug("end pull_workflow")
         return msg
 
-    def sub_receive(self, socket, idx):
+    def sub_receive(self, socket, idx):  # pylint: disable=unused-argument
         return TaggedMessage(*socket.recv_multipart())
 
     def pull_receive(self):

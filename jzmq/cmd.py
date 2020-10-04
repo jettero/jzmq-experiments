@@ -26,7 +26,11 @@ def chat(laddr, raddr, identity, verbosity, keyring):  # pylint: disable=unused-
         if verbosity < 4:
             logging.getLogger("zmq.auth").propagate = False
 
-    logging.basicConfig(level=log_level)
+    logging.basicConfig(
+        level=log_level,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        format="%(name)s [%(process)d] %(levelname)s: %(message)s",
+    )
 
     sn = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
     sn.poller.register(sys.stdin, zmq.POLLIN)

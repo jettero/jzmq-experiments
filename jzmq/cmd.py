@@ -1,12 +1,23 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import sys
+import threading
 import logging
 import click
 import zmq
+from prompt_toolkit import prompt
+from prompt_toolkit.patch_stdout import patch_stdout
 from .node import RelayNode as Node, DEFAULT_KEYRING
 
+ALIVE = True
+
+def jzmq_node_tasks(node):
+    while ALIVE:
+        msgs = node.poll(50)
+        for msg in msgs:
+            print(f"{msg.name}: {msg.msg}")
+
+    node.closekill()
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
@@ -16,7 +27,9 @@ from .node import RelayNode as Node, DEFAULT_KEYRING
 @click.option("-i", "--identity", type=str, help="[default <hostname>-<baseport>]")
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
-def chat(laddr, raddr, identity, verbosity, keyring):  # pylint: disable=unused-argument
+@click.option("--vi-input/--emacs-input", "vi_mode", default=False)
+def chat(laddr, raddr, identity, verbosity, keyring, vi_mode):  # pylint: disable=unused-argument
+    global ALIVE
 
     log_level = logging.ERROR
     if verbosity > 0:
@@ -26,28 +39,37 @@ def chat(laddr, raddr, identity, verbosity, keyring):  # pylint: disable=unused-
         if verbosity < 4:
             logging.getLogger("zmq.auth").propagate = False
 
-    logging.basicConfig(
-        level=log_level,
-        datefmt="%Y-%m-%d %H:%M:%S",
-        format="%(name)s [%(process)d] %(levelname)s: %(message)s",
-    )
+    with patch_stdout():
+        logging.basicConfig(
+            level=log_level,
+            datefmt="%Y-%m-%d %H:%M:%S",
+            format="%(name)s [%(process)d] %(levelname)s: %(message)s",
+        )
 
-    sn = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
-    sn.poller.register(sys.stdin, zmq.POLLIN)
+        node = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
+        node_thread = threading.Thread(target=jzmq_node_tasks, args=(node,))
+        node_thread.start()
+        identity = node.identity
 
-    ssinfno = sys.stdin.fileno()
-    to_send = list()
+        node.publish_message('* enter')
 
-    def read_a_line(sock):
-        # normally the poller hands us our fileno, not the socket, so sock=0 is
-        # the expected arg for sys.stdin
-        if sock in (ssinfno, sys.stdin):
-            line = sys.stdin.readline().rstrip()
-            to_send.append(line)
+        while ALIVE:
+            try:
+                line = prompt(f'{identity}> ', vi_mode=vi_mode)
+            except KeyboardInterrupt:
+                print(f"{identity}: ^C break")
+                break
+            except EOFError:
+                print(f"{identity}: EOF")
+                break
 
-    while True:
-        msgs = sn.poll(50, other_cb=read_a_line)
-        for msg in msgs:
-            print(f"{msg.name}: {msg.msg}")
-        while to_send:
-            sn.publish_message(to_send.pop(0))
+            if line.lower().strip() in ("exit", "stop", "quit"):
+                print(f"{identity}:", line, "(quitting)")
+                break
+
+            if line and line.strip():
+                node.publish_message(line)
+
+    node.publish_message('* exit')
+    ALIVE = False
+    node_thread.join()

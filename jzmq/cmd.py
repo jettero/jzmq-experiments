@@ -41,6 +41,7 @@ def chat(
             log_level = logging.DEBUG
         if verbosity < 4:
             logging.getLogger("zmq.auth").propagate = False
+            logging.getLogger("asyncio").propagate = False
 
     with patch_stdout():
         logging.basicConfig(

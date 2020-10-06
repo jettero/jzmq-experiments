@@ -5,6 +5,7 @@ import sys, signal
 import re
 import logging
 import time
+from collections import namedtuple
 from threading import Thread
 from socket import gethostname
 
@@ -16,7 +17,6 @@ from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
-
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -123,13 +123,18 @@ class StupidNode:
             zmq.auth.create_certificates(self.keyring, self.key_basename)
             self.load_key()
 
-    def publish_message(self, msg, no_push=False, no_push_to=None):
+    def preprocess_message(self, msg):
         if not isinstance(msg, TaggedMessage):
             msg = TaggedMessage(msg, name=self.identity)
         rmsg = repr(msg)
-        e_msg = msg.encode()
+        emsg = msg.encode()
+        return msg, rmsg, emsg
+
+    def publish_message(self, msg, no_push=False, no_push_to=None):
+        msg, rmsg, emsg = self.preprocess_message(msg)
+        self.local_workflow(msg)
         self.log.debug("publishing message %s", rmsg)
-        self.pub.send_multipart(e_msg)
+        self.pub.send_multipart(emsg)
         if no_push:
             return
         if no_push_to is None:
@@ -146,7 +151,7 @@ class StupidNode:
         for i, sock in enumerate(self.push):
             if ok_send(i):
                 self.log.debug("pushing message %s to %s", rmsg, self.endpoints[i])
-                sock.send_multipart(e_msg)
+                sock.send_multipart(emsg)
             else:
                 self.log.debug("not sending %s to %s", rmsg, self.endpoints[i])
 
@@ -186,6 +191,13 @@ class StupidNode:
             socket.curve_publickey = self.pubkey
 
         return socket
+
+    def local_react(self, msg):
+        pass
+
+    def local_workflow(self, msg):
+        msg = self.local_react(msg)
+        return msg
 
     def sub_workflow(self, socket):
         idx = self.sub.index(socket)
@@ -401,16 +413,19 @@ class RelayNode(StupidNode):
         self.recent.add(msg.tag)
         return False
 
+    def local_react(self, msg):
+        self.recent.add(msg.tag)
+
     def sub_react(self, msg, idx):
-        msg = super().sub_react(msg, idx)
         if self._is_repeat(msg):
             return False
+        msg = super().sub_react(msg, idx)
         self.publish_message(msg, no_push_to=idx)
         return msg
 
     def pull_react(self, msg):
-        msg = super().pull_react(msg)
         if self._is_repeat(msg):
             return False
+        msg = super().pull_react(msg)
         self.publish_message(msg)
         return msg

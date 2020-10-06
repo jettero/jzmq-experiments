@@ -16,9 +16,13 @@ def jzmq_node_tasks(node):
         msgs = node.poll(50)
         for msg in msgs:
             print(f"{msg.name}: {msg.msg}")
-
     node.closekill()
 
+class ChatNode(Node):
+    def nonlocal_react(self, msg):
+        if msg.msg == '* enter':
+            self.route_message(msg.tag.name, '* is here')
+        return msg
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
@@ -50,9 +54,8 @@ def chat(
             format="%(name)s [%(process)d] %(levelname)s: %(message)s",
         )
 
-        node = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(
-            *raddr
-        )
+        node = ChatNode(laddr, identity=identity, keyring=keyring)
+        node.connect_to_endpoints(*raddr)
         node_thread = threading.Thread(target=jzmq_node_tasks, args=(node,))
         node_thread.start()
         identity = node.identity

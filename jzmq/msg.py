@@ -80,6 +80,8 @@ class TaggedMessage(StupidMessage):
                     self.tag = Tag(name)
 
     def __eq__(self, other):
+        if isinstance(other, TaggedMessage):
+            return self.tag == other.tag and self.msg == other.msg
         return self.msg == other
 
     def __str__(self):

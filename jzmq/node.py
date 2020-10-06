@@ -12,7 +12,7 @@ from socket import gethostname
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
-from .msg import TaggedMessage
+from .msg import TaggedMessage, StupidMessage
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
@@ -130,6 +130,12 @@ class StupidNode:
         emsg = msg.encode()
         return msg, rmsg, emsg
 
+    def route_message(self, to, msg):
+        msg, rmsg, emsg = self.preprocess_message(msg)
+        self.log.debug("routing message %s to %s", rmsg, to)
+        emsg = StupidMessage(to).encode() + emsg
+        self.router.send_multipart(emsg)
+
     def publish_message(self, msg, no_push=False, no_push_to=None):
         msg, rmsg, emsg = self.preprocess_message(msg)
         self.local_workflow(msg)
@@ -192,11 +198,10 @@ class StupidNode:
 
         return socket
 
-    def local_react(self, msg):
-        pass
-
     def local_workflow(self, msg):
         msg = self.local_react(msg)
+        if msg:
+            msg = self.all_react(msg)
         return msg
 
     def sub_workflow(self, socket):
@@ -204,15 +209,33 @@ class StupidNode:
         enp = self.endpoints[idx]
         self.log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.sub_receive(socket, idx)
-        msg = self.sub_react(msg, idx)
+        if msg:
+            msg = self.sub_react(msg, idx)
+            for react in (self.nonlocal_react, self.all_react):
+                if not msg:
+                    break
+                msg = react(msg)
         self.log.debug("end sub_workflow")
         return msg
 
     def pull_workflow(self):
         self.log.debug("start pull_workflow")
         msg = self.pull_receive()
-        msg = self.pull_react(msg)
+        for react in (self.pull_react, self.nonlocal_react, self.all_react):
+            if not msg:
+                break
+            msg = react(msg)
         self.log.debug("end pull_workflow")
+        return msg
+
+    def deal_workflow(self):
+        self.log.debug("start deal_workflow")
+        msg = self.deal_receive()
+        for react in (self.deal_react, self.nonlocal_react, self.all_react):
+            if not msg:
+                break
+            msg = react(msg)
+        self.log.debug("end deal_workflow")
         return msg
 
     def sub_receive(self, socket, idx):  # pylint: disable=unused-argument
@@ -220,6 +243,15 @@ class StupidNode:
 
     def pull_receive(self):
         return TaggedMessage(*self.pull.recv_multipart())
+
+    def all_react(self, msg):
+        return msg
+
+    def nonlocal_react(self, msg):
+        return msg
+
+    def local_react(self, msg):
+        return msg
 
     def sub_react(self, msg, idx):
         self.log.debug("sub_react(%r, %d -> %s)", msg, idx, self.endpoints[idx])
@@ -230,6 +262,9 @@ class StupidNode:
         return msg
 
     def poll(self, timeo=500, other_cb=None):
+        """ Check to see if there's any incoming messages. If anything seems ready to receive, 
+            invoke the related workflow or invoke other_cb (if given) on the socket item.
+        """
         items = dict(self.poller.poll(timeo))
         ret = list()
         for item in items:
@@ -400,12 +435,12 @@ class RelayNode(StupidNode):
         self.recent = set()
         self.dup_time = dup_time
 
-    def _cleanup_recent(self):
+    def cleanup_recent(self):
         old = time.time() - self.dup_time
         self.recent = set(x for x in self.recent if x.time > old)
 
-    def _is_repeat(self, msg):
-        self._cleanup_recent()
+    def is_repeat(self, msg):
+        self.cleanup_recent()
         if msg.tag in self.recent:
             self.log.debug("%r may be a repeat, not (re)broadcasting", msg)
             return True
@@ -414,17 +449,19 @@ class RelayNode(StupidNode):
         return False
 
     def local_react(self, msg):
+        msg = super().local_react(msg)
         self.recent.add(msg.tag)
+        return msg
 
     def sub_react(self, msg, idx):
-        if self._is_repeat(msg):
+        if self.is_repeat(msg):
             return False
         msg = super().sub_react(msg, idx)
         self.publish_message(msg, no_push_to=idx)
         return msg
 
     def pull_react(self, msg):
-        if self._is_repeat(msg):
+        if self.is_repeat(msg):
             return False
         msg = super().pull_react(msg)
         self.publish_message(msg)

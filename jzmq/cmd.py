@@ -4,12 +4,12 @@
 import threading
 import logging
 import click
-import zmq
 from prompt_toolkit import prompt
 from prompt_toolkit.patch_stdout import patch_stdout
 from .node import RelayNode as Node, DEFAULT_KEYRING
 
 ALIVE = True
+
 
 def jzmq_node_tasks(node):
     while ALIVE:
@@ -18,6 +18,7 @@ def jzmq_node_tasks(node):
             print(f"{msg.name}: {msg.msg}")
 
     node.closekill()
+
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)
@@ -28,7 +29,9 @@ def jzmq_node_tasks(node):
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
 @click.option("--vi-input/--emacs-input", "vi_mode", default=False)
-def chat(laddr, raddr, identity, verbosity, keyring, vi_mode):  # pylint: disable=unused-argument
+def chat(
+    laddr, raddr, identity, verbosity, keyring, vi_mode
+):  # pylint: disable=unused-argument
     global ALIVE
 
     log_level = logging.ERROR
@@ -46,16 +49,18 @@ def chat(laddr, raddr, identity, verbosity, keyring, vi_mode):  # pylint: disabl
             format="%(name)s [%(process)d] %(levelname)s: %(message)s",
         )
 
-        node = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(*raddr)
+        node = Node(laddr, identity=identity, keyring=keyring).connect_to_endpoints(
+            *raddr
+        )
         node_thread = threading.Thread(target=jzmq_node_tasks, args=(node,))
         node_thread.start()
         identity = node.identity
 
-        node.publish_message('* enter')
+        node.publish_message("* enter")
 
         while ALIVE:
             try:
-                line = prompt(f'{identity}> ', vi_mode=vi_mode)
+                line = prompt(f"{identity}> ", vi_mode=vi_mode)
             except KeyboardInterrupt:
                 print(f"{identity}: ^C break")
                 break
@@ -70,6 +75,6 @@ def chat(laddr, raddr, identity, verbosity, keyring, vi_mode):  # pylint: disabl
             if line and line.strip():
                 node.publish_message(line)
 
-    node.publish_message('* exit')
+    node.publish_message("* exit")
     ALIVE = False
     node_thread.join()

@@ -18,11 +18,13 @@ def jzmq_node_tasks(node):
             print(f"{msg.name}: {msg.msg}")
     node.closekill()
 
+
 class ChatNode(Node):
-    def nonlocal_react(self, msg):
-        if msg.msg == '* enter':
-            self.route_message(msg.tag.name, '* is here')
+    def nonlocal_react(self, msg, idx=None):
+        if msg.msg == "* enter":
+            self.route_message(msg.tag.name, "* is here")
         return msg
+
 
 @click.command()
 @click.option("-v", "--verbose", "verbosity", count=True)

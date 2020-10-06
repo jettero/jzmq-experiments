@@ -54,7 +54,7 @@ def test_tarch_E_to_net(tarch):
     assert tarch.B.received_messages == ir
     assert tarch.C.received_messages == er
     assert tarch.D.received_messages == er
-    assert tarch.E.received_messages == er
+    assert tarch.E.received_messages == ir
 
     do_poll(log, tarch, "second", 50)
 
@@ -95,7 +95,7 @@ def test_tarch_B_to_net(tarch):
     do_poll(log, tarch, "second", 50)
 
     assert tarch.A.received_messages == ir
-    assert tarch.B.received_messages == er
+    assert tarch.B.received_messages == ir
     assert tarch.C.received_messages == ir
     assert tarch.D.received_messages == ir
     assert tarch.E.received_messages == ir

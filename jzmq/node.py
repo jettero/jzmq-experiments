@@ -5,7 +5,6 @@ import sys, signal
 import re
 import logging
 import time
-from collections import namedtuple
 from threading import Thread
 from socket import gethostname
 
@@ -17,6 +16,7 @@ from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
+
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -48,24 +48,22 @@ class StupidNode:
         self.log.debug("creating sockets")
 
         self.pub = self.mk_socket(zmq.PUB)
-        self.pull = self.mk_socket(zmq.PULL)
         self.router = self.mk_socket(zmq.ROUTER)
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
         self.sub = list()
-        self.push = list()
+        self.dealer = list()
 
         self.log.debug("binding sockets")
 
         self.bind(self.pub)
-        self.bind(self.pull)
         self.bind(self.router)
         self.bind(self.rep, enable_curve=False)
 
         self.log.debug("registering polling")
 
         self.poller = zmq.Poller()
-        self.poller.register(self.pull, zmq.POLLIN)
+        self.poller.register(self.router, zmq.POLLIN)
 
         self.log.debug("configuring interrupt signal")
         signal.signal(signal.SIGINT, self.interrupt)
@@ -136,27 +134,27 @@ class StupidNode:
         emsg = StupidMessage(to).encode() + emsg
         self.router.send_multipart(emsg)
 
-    def publish_message(self, msg, no_push=False, no_push_to=None):
+    def publish_message(self, msg, no_deal=False, no_deal_to=None):
         msg, rmsg, emsg = self.preprocess_message(msg)
         self.local_workflow(msg)
         self.log.debug("publishing message %s", rmsg)
         self.pub.send_multipart(emsg)
-        if no_push:
+        if no_deal:
             return
-        if no_push_to is None:
+        if no_deal_to is None:
             ok_send = lambda x: True
-        elif callable(no_push_to):
-            ok_send = no_push_to
-        elif isinstance(no_push_to, self.pull.__class__):
-            npt_i = self.push.index(no_push_to)
+        elif callable(no_deal_to):
+            ok_send = no_deal_to
+        elif isinstance(no_deal_to, zmq.Socket):
+            npt_i = self.dealer.index(no_deal_to)
             ok_send = lambda x: x != npt_i
-        elif isinstance(no_push_to, int):
-            ok_send = lambda x: x != no_push_to
-        elif isinstance(no_push_to, (list, tuple)):
-            ok_send = lambda x: x not in no_push_to
-        for i, sock in enumerate(self.push):
+        elif isinstance(no_deal_to, int):
+            ok_send = lambda x: x != no_deal_to
+        elif isinstance(no_deal_to, (list, tuple)):
+            ok_send = lambda x: x not in no_deal_to
+        for i, sock in enumerate(self.dealer):
             if ok_send(i):
-                self.log.debug("pushing message %s to %s", rmsg, self.endpoints[i])
+                self.log.debug("dealing message %s to %s", rmsg, self.endpoints[i])
                 sock.send_multipart(emsg)
             else:
                 self.log.debug("not sending %s to %s", rmsg, self.endpoints[i])
@@ -209,61 +207,58 @@ class StupidNode:
         enp = self.endpoints[idx]
         self.log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.sub_receive(socket, idx)
-        if msg:
-            msg = self.sub_react(msg, idx)
-            for react in (self.nonlocal_react, self.all_react):
-                if not msg:
-                    break
-                msg = react(msg)
+        for react in (self.nonlocal_react, self.all_react):
+            if msg:
+                msg = react(msg, idx=idx)
         self.log.debug("end sub_workflow")
         return msg
 
-    def pull_workflow(self):
-        self.log.debug("start pull_workflow")
-        msg = self.pull_receive()
-        for react in (self.pull_react, self.nonlocal_react, self.all_react):
+    def router_workflow(self):
+        self.log.debug("start router_workflow")
+        msg = self.router_receive()
+        for react in (self.nonlocal_react, self.all_react):
             if not msg:
                 break
             msg = react(msg)
-        self.log.debug("end pull_workflow")
+        self.log.debug("end router_workflow")
         return msg
 
-    def deal_workflow(self):
-        self.log.debug("start deal_workflow")
-        msg = self.deal_receive()
-        for react in (self.deal_react, self.nonlocal_react, self.all_react):
+    def dealer_workflow(self, socket):
+        idx = self.dealer.index(socket)
+        enp = self.endpoints[idx]
+        self.log.debug("start deal_workflow (idx=%d -> endpoint=%s)", idx, enp)
+        msg = self.dealer_receive(socket, idx)
+        for react in (self.nonlocal_react, self.all_react):
             if not msg:
                 break
-            msg = react(msg)
+            msg = react(msg, idx=idx)
         self.log.debug("end deal_workflow")
         return msg
 
     def sub_receive(self, socket, idx):  # pylint: disable=unused-argument
         return TaggedMessage(*socket.recv_multipart())
 
-    def pull_receive(self):
-        return TaggedMessage(*self.pull.recv_multipart())
+    def dealer_receive(self, socket, idx):  # pylint: disable=unused-argument
+        return TaggedMessage(*socket.recv_multipart())
 
-    def all_react(self, msg):
+    def router_receive(self):
+        _, *msg = self.router.recv_multipart()
+        # we ignore the source ID (in '_') and just believe the msg.tag.name ... it's
+        # roughly the same thing anyway
+        return TaggedMessage(*msg)
+
+    def all_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
-    def nonlocal_react(self, msg):
+    def nonlocal_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
     def local_react(self, msg):
         return msg
 
-    def sub_react(self, msg, idx):
-        self.log.debug("sub_react(%r, %d -> %s)", msg, idx, self.endpoints[idx])
-        return msg
-
-    def pull_react(self, msg):
-        self.log.debug("pull_react(%r)", msg)
-        return msg
-
     def poll(self, timeo=500, other_cb=None):
-        """ Check to see if there's any incoming messages. If anything seems ready to receive, 
-            invoke the related workflow or invoke other_cb (if given) on the socket item.
+        """Check to see if there's any incoming messages. If anything seems ready to receive,
+        invoke the related workflow or invoke other_cb (if given) on the socket item.
         """
         items = dict(self.poller.poll(timeo))
         ret = list()
@@ -272,15 +267,27 @@ class StupidNode:
                 continue
             if item in self.sub:
                 res = self.sub_workflow(item)
-            elif item is self.pull:
-                res = self.pull_workflow()
+            elif item in self.dealer:
+                res = self.dealer_workflow(item)
+            elif item is self.router:
+                res = self.router_workflow()
             elif callable(other_cb):
                 res = other_cb(item)
             else:
-                self.log.error(
-                    "no workflow defined for socket of type %s",
-                    zmq_socket_type_name(item),
-                )
+                res = None
+                if False and isinstance(item, zmq.Socket):
+                    self.log.error(
+                        "no workflow defined for socket of type %s -- received: %s",
+                        zmq_socket_type_name(item),
+                        item.recv_multipart(),
+                    )
+                else:
+                    self.log.error(
+                        "no workflow defined for socket of type %s -- regarding as fatal",
+                        zmq_socket_type_name(item),
+                    )
+                    # note: this normally doesn't trigger an exit... thanks threading
+                    raise Exception("unhandled poll item")
             if isinstance(res, TaggedMessage):
                 ret.append(res)
         return ret
@@ -418,8 +425,9 @@ class StupidNode:
         self.poller.register(sub, zmq.POLLIN)
         self.sub.append(sub)
 
-        psh = self._create_connected_socket(endpoint, zmq.PUSH, epk)
-        self.push.append(psh)
+        deal = self._create_connected_socket(endpoint, zmq.DEALER, epk)
+        self.poller.register(deal, zmq.POLLIN)
+        self.dealer.append(deal)
 
         self.endpoints.append(endpoint)
 
@@ -453,16 +461,8 @@ class RelayNode(StupidNode):
         self.recent.add(msg.tag)
         return msg
 
-    def sub_react(self, msg, idx):
+    def nonlocal_react(self, msg, idx=None):
         if self.is_repeat(msg):
             return False
-        msg = super().sub_react(msg, idx)
-        self.publish_message(msg, no_push_to=idx)
-        return msg
-
-    def pull_react(self, msg):
-        if self.is_repeat(msg):
-            return False
-        msg = super().pull_react(msg)
-        self.publish_message(msg)
+        self.publish_message(msg, no_deal_to=idx)
         return msg

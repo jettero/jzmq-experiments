@@ -2,3 +2,7 @@
 __pycache__
 *.pyc
 t/test-keyring
+jzmq/__version__.py
+jzmq.egg-info
+build
+dist

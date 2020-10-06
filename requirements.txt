@@ -1,2 +1,6 @@
 pyzmq
 click
+prompt_toolkit
+pytest-cov
+pytest-pythonpath
+pytest-html

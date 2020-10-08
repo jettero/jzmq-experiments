@@ -2,8 +2,11 @@
 # coding: utf-8
 
 import logging
+import pytest
 from jzmq import Node
 
+TEST_REPETITIONS = 10
+MSG_WAIT_MS = 5
 
 def test_tarch_desc(tarch_names, tarch_desc):
     assert tarch_names == tuple("A B C D E".split())
@@ -37,7 +40,8 @@ def do_poll(log, tarch, tag, wait):
             item.received_messages += res
 
 
-def test_tarch_E_to_net(tarch):
+@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+def test_tarch_E_to_net(tarch, loop):
     test_msg = "test_tarch_msgs"
 
     log = logging.getLogger(f"{__name__}:E2")
@@ -48,7 +52,7 @@ def test_tarch_E_to_net(tarch):
     er = [test_msg]
     ir = list()
 
-    do_poll(log, tarch, "first", 50)
+    do_poll(log, tarch, "first", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == ir
     assert tarch.B.received_messages == ir
@@ -56,7 +60,7 @@ def test_tarch_E_to_net(tarch):
     assert tarch.D.received_messages == er
     assert tarch.E.received_messages == ir
 
-    do_poll(log, tarch, "second", 50)
+    do_poll(log, tarch, "second", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == er
     assert tarch.B.received_messages == er
@@ -64,7 +68,7 @@ def test_tarch_E_to_net(tarch):
     assert tarch.D.received_messages == ir
     assert tarch.E.received_messages == ir
 
-    do_poll(log, tarch, "third", 50)
+    do_poll(log, tarch, "third", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == ir
     assert tarch.B.received_messages == ir
@@ -73,7 +77,8 @@ def test_tarch_E_to_net(tarch):
     assert tarch.E.received_messages == ir
 
 
-def test_tarch_B_to_net(tarch):
+@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+def test_tarch_B_to_net(tarch, loop):
     test_msg = "test_tarch_msgs"
 
     log = logging.getLogger(f"{__name__}:B2")
@@ -84,7 +89,7 @@ def test_tarch_B_to_net(tarch):
     er = [test_msg]
     ir = list()
 
-    do_poll(log, tarch, "first", 50)
+    do_poll(log, tarch, "first", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == er
     assert tarch.B.received_messages == ir
@@ -92,7 +97,7 @@ def test_tarch_B_to_net(tarch):
     assert tarch.D.received_messages == er
     assert tarch.E.received_messages == er
 
-    do_poll(log, tarch, "second", 50)
+    do_poll(log, tarch, "second", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == ir
     assert tarch.B.received_messages == ir
@@ -100,10 +105,27 @@ def test_tarch_B_to_net(tarch):
     assert tarch.D.received_messages == ir
     assert tarch.E.received_messages == ir
 
-    do_poll(log, tarch, "third", 50)
+    do_poll(log, tarch, "third", MSG_WAIT_MS)
 
     assert tarch.A.received_messages == ir
     assert tarch.B.received_messages == ir
     assert tarch.C.received_messages == ir
     assert tarch.D.received_messages == ir
     assert tarch.E.received_messages == ir
+
+@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+def test_linear0(linear0, loop):
+    test_msg = 'hiya'
+    er = [test_msg]
+    ir = list()
+    log = logging.getLogger(f"{__name__}:lin0")
+
+    linear0.A.publish_message(test_msg)
+
+    do_poll(log, linear0, "first", MSG_WAIT_MS)
+
+    assert linear0.A.received_messages == ir
+    assert linear0.B.received_messages == er
+    assert linear0.C.received_messages == er
+    assert linear0.D.received_messages == er
+    assert linear0.E.received_messages == er

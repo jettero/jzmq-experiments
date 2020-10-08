@@ -7,9 +7,10 @@ import pytest
 from jzmq import Node
 
 TEST_REPETITIONS = os.environ.get("JZMQ_TARCH_REPEAT", 5)
-MSG_WAIT_MS = os.environ.get('JZMQ_TARCH_MSG_WAIT', 10)
+MSG_WAIT_MS = os.environ.get("JZMQ_TARCH_MSG_WAIT", 10)
 
 log = logging.getLogger(__name__)
+
 
 def test_tarch_desc(tarch_names, tarch_desc):
     assert 0 < len(tarch_names) < 100
@@ -56,9 +57,10 @@ class PollWrapper:
         for node in self.tarch:
             del node.received_messages
 
+
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 def test_publish_from_A(tarch, loop):
-    test_msg = f'test_msg({loop})'
+    test_msg = f"test_msg({loop})"
     log.info('publishing "%s" from %s', test_msg, tarch.A)
 
     tarch.A.publish_message(test_msg)

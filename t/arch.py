@@ -65,7 +65,7 @@ def read_node_description(file="NOTES.txt"):
         for line in fh:
             if "TEST_ARCH" in line:
                 for lhs, rhs in c.findall(line):
-                    for _hs in (lhs,rhs):
+                    for _hs in (lhs, rhs):
                         if _hs not in tmp:
                             port = _get_port(port)
                             tmp[_hs] = Ndesc(

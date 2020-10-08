@@ -298,14 +298,14 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
-        if hasattr(self, 'auth') and self.auth is not None:
+        if hasattr(self, "auth") and self.auth is not None:
             if self.auth.is_alive():
                 self.log.debug("trying to stop auth thread")
                 self.auth.stop()
                 self.log.debug("auth thread seems to have stopped")
             del self.auth
 
-        if hasattr(self, '_wai_thread'):
+        if hasattr(self, "_wai_thread"):
             if self._wai_thread.is_alive():
                 self.log.debug("WAI Thread seems to be alive, trying to join")
                 self._wai_continue = False
@@ -313,12 +313,12 @@ class StupidNode:
                 self.log.debug("WAI Thread seems to jave joined us.")
             del self._wai_thread
 
-        if hasattr(self, 'cleartext_ctx'):
+        if hasattr(self, "cleartext_ctx"):
             self.log.debug("destroying cleartext context")
             self.cleartext_ctx.destroy(1)
             del self.cleartext_ctx
 
-        if hasattr(self, 'ctx'):
+        if hasattr(self, "ctx"):
             self.log.debug("destroying crypto context")
             self.ctx.destroy(1)
             del self.ctx

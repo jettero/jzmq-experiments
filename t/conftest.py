@@ -18,13 +18,16 @@ log = logging.getLogger(__name__)
 def always_true():
     return True
 
-@pytest.fixture(scope='session', params=['NOTES.txt'] + glob('t/resource/tarch/*.txt'))
+
+@pytest.fixture(scope="session", params=["NOTES.txt"] + glob("t/resource/tarch/*.txt"))
 def tarch_desc(request):
     yield t.arch.read_node_description(file=request.param)
+
 
 @pytest.fixture(scope="session")
 def tarch_names(tarch_desc):
     yield tuple(sorted(tarch_desc))
+
 
 @pytest.fixture(scope="function")
 def tarch(tarch_desc, tarch_names):
@@ -39,6 +42,7 @@ def tarch(tarch_desc, tarch_names):
     log.info("destroying tarch nodes")
     for node in nodes:
         node.closekill()
+
 
 #################### logging filter opts
 def pytest_addoption(parser):
@@ -84,7 +88,7 @@ def pytest_runtest_call(item):
             funcname,
         ) = item.location  # item.name is just the function name
         profile_name = filename.split("/")[-1][:-3]
-        profile_name += "-" + funcname.replace('/','-') + ".pstats"
+        profile_name += "-" + funcname.replace("/", "-") + ".pstats"
         prof_filename = os.path.join(output_dir, profile_name)
         prof_filenames.add(prof_filename)
         try:

@@ -1,14 +1,14 @@
 # coding: utf-8
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name,import-outside-toplevel
 
 import os
 import time
 import logging
 from glob import glob
 from collections import namedtuple
+import pytest
 import zmq
 import jzmq
-import pytest
 import t.arch
 
 log = logging.getLogger(__name__)
@@ -79,6 +79,7 @@ zmq_dir = os.path.dirname(zmq.__file__)
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
+    # pylint: disable=unused-variable
     if os.environ.get("JZMQ_PROFILE"):
         import cProfile
 
@@ -106,7 +107,7 @@ def pytest_runtest_call(item):
         prof_filenames.add(prof_filename)
 
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish(session, exitstatus):  # pylint: disable=unused-argument
     if os.environ.get("JZMQ_PROFILE"):
         import pstats
         import subprocess
@@ -144,9 +145,3 @@ def pytest_sessionfinish(session, exitstatus):
                 gp = subprocess.Popen(gp_cmd, stdout=subprocess.PIPE)
                 dp = subprocess.Popen(["dot", "-Tsvg", "-o", csvg], stdin=gp.stdout)
                 dp.communicate()
-
-    pcmf = os.environ.get("JZMQ_PROFILE_CHOWN_USER")
-    if pcmf:
-        p = subprocess.Popen(["chown", "-R", pcmf, sources_dir])
-        p.communicate()
-        print("\nchowned back files to {}".format(pcmf))

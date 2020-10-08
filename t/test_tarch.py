@@ -6,7 +6,7 @@ import pytest
 from jzmq import Node
 
 TEST_REPETITIONS = 10
-MSG_WAIT_MS = 5
+MSG_WAIT_MS = 50
 
 def test_tarch_desc(tarch_names, tarch_desc):
     assert tarch_names == tuple("A B C D E".split())

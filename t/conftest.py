@@ -138,8 +138,9 @@ def pytest_sessionfinish(session, exitstatus):
                 csvg      = os.path.join(output_dir, 'combined.svg')
                 combined.dump_stats(cfilename)
 
-
-                gp_cmd = [ 'gprof2dot', '-f', 'pstats', '-p', zmq_dir, '-p', jzmq_dir, cfilename ]
+                gp_cmd = [ 'gprof2dot', '-f', 'pstats',
+                    '-p', tests_dir, '-p', zmq_dir, '-p', jzmq_dir,
+                    cfilename ]
 
                 gp = subprocess.Popen(gp_cmd, stdout=subprocess.PIPE)
                 dp = subprocess.Popen(['dot', '-Tsvg', '-o', csvg], stdin=gp.stdout)

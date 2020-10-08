@@ -1,0 +1,2 @@
+TEST_ARCH    A → B, B → C
+TEST_ARCH    C → D, D → E

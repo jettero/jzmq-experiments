@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import time
 import logging
 import pytest
 from jzmq import Node
 
 TEST_REPETITIONS = 10
-MSG_WAIT_MS = 1
-PUBLISH_WAIT_S = 0.1
+MSG_WAIT_MS = 10
 
 def test_tarch_desc(tarch_names, tarch_desc):
     assert tarch_names == tuple("A B C D E".split())
@@ -50,7 +48,6 @@ def test_tarch_E_to_net(tarch, loop):
 
     log.info("publishing %s from %s", test_msg, tarch.E)
     tarch.E.publish_message(test_msg)
-    time.sleep(PUBLISH_WAIT_S)
 
     received_test_message = [test_msg]
     did_not_receive = list()
@@ -88,7 +85,6 @@ def test_tarch_B_to_net(tarch, loop):
 
     log.info("publishing %s from %s", test_msg, tarch.B)
     tarch.B.publish_message(test_msg)
-    time.sleep(PUBLISH_WAIT_S)
 
     received_test_message = [test_msg]
     did_not_receive = list()
@@ -125,7 +121,6 @@ def test_linear0(linear0, loop):
     log = logging.getLogger(f"{__name__}:lin0")
 
     linear0.A.publish_message(test_msg)
-    time.sleep(PUBLISH_WAIT_S)
 
     do_poll(log, linear0, "first", MSG_WAIT_MS)
 

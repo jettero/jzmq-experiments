@@ -1,133 +1,74 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import os
 import logging
 import pytest
 from jzmq import Node
 
-TEST_REPETITIONS = 10
-MSG_WAIT_MS = 10
+TEST_REPETITIONS = os.environ.get("JZMQ_TARCH_REPEAT", 2)
+MSG_WAIT_MS = os.environ.get('JZMQ_TARCH_MSG_WAIT', 10)
 
+log = logging.getLogger(__name__)
 
 def test_tarch_desc(tarch_names, tarch_desc):
-    assert tarch_names == tuple("A B C D E".split())
+    assert 0 < len(tarch_names) < 100
     assert tuple(sorted(tarch_desc)) == tarch_names
 
     for k in tarch_names:
-        assert len(tarch_desc[k].endpoints) == 1 if k == "E" else 2
         for item in tarch_desc[k].endpoints:
             assert item in tarch_names
 
 
 def test_tarch_construction(tarch, tarch_names):
-    for item in tarch:
-        assert isinstance(item, Node)
+    for node in tarch:
+        assert isinstance(node, Node)
 
     assert len(tarch_names) == len(tarch)
-    for k, item in zip(tarch_names, tarch):
-        assert item is getattr(tarch, k)
+    for k, node in zip(tarch_names, tarch):
+        assert node is getattr(tarch, k)
 
 
-def do_poll(log, tarch, tag, wait):
-    log.info("%s poll(%d)", tag, wait)
+class PollWrapper:
+    def __init__(self, tarch):
+        self.tarch = tarch
 
-    for node in tarch:
-        node.received_messages = list()
+    def __enter__(self):
+        for node in self.tarch:
+            node.received_messages = list()
+        return self.do_poll
 
-    for node in tarch:
-        res = [str(x) for x in node.poll(MSG_WAIT_MS)]
-        if res:
-            log.info("%s received %d msg(s)", node, len(res))
-            node.received_messages += res
+    def do_poll(self):
+        loops = 0
+        did_something = True
+        while did_something:
+            did_something = False
+            for node in self.tarch:
+                res = [str(x) for x in node.poll(MSG_WAIT_MS)]
+                if res:
+                    log.info("%s received %d msg(s)", node, len(res))
+                    node.received_messages += res
+                    did_something = True
+            loops += 1
+        return loops
 
-
-@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-def test_tarch_E_to_net(tarch, loop):
-    test_msg = f"test_tarch_msgs-{loop}"
-
-    log = logging.getLogger(f"{__name__}:E2")
-
-    log.info("publishing %s from %s", test_msg, tarch.E)
-    tarch.E.publish_message(test_msg)
-
-    received_test_message = [test_msg]
-    did_not_receive = list()
-
-    do_poll(log, tarch, "first", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == did_not_receive
-    assert tarch.B.received_messages == did_not_receive
-    assert tarch.C.received_messages == received_test_message
-    assert tarch.D.received_messages == received_test_message
-    assert tarch.E.received_messages == did_not_receive
-
-    do_poll(log, tarch, "second", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == received_test_message
-    assert tarch.B.received_messages == received_test_message
-    assert tarch.C.received_messages == did_not_receive
-    assert tarch.D.received_messages == did_not_receive
-    assert tarch.E.received_messages == did_not_receive
-
-    do_poll(log, tarch, "third", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == did_not_receive
-    assert tarch.B.received_messages == did_not_receive
-    assert tarch.C.received_messages == did_not_receive
-    assert tarch.D.received_messages == did_not_receive
-    assert tarch.E.received_messages == did_not_receive
-
+    def __exit__(self, *exc):
+        for node in self.tarch:
+            del node.received_messages
 
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-def test_tarch_B_to_net(tarch, loop):
-    test_msg = f"test_tarch_msgs-{loop}"
+def test_publish_from_A(tarch, loop):
+    test_msg = f'test_msg({loop})'
+    log.info('publishing "%s" from %s', test_msg, tarch.A)
 
-    log = logging.getLogger(f"{__name__}:B2")
+    tarch.A.publish_message(test_msg)
 
-    log.info("publishing %s from %s", test_msg, tarch.B)
-    tarch.B.publish_message(test_msg)
+    with PollWrapper(tarch) as do_poll:
+        log.info("polling ran for count=%d round(s)", do_poll())
 
-    received_test_message = [test_msg]
-    did_not_receive = list()
+        received_test_message = [test_msg]
+        did_not_receive = list()
 
-    do_poll(log, tarch, "first", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == received_test_message
-    assert tarch.B.received_messages == did_not_receive
-    assert tarch.C.received_messages == received_test_message
-    assert tarch.D.received_messages == received_test_message
-    assert tarch.E.received_messages == received_test_message
-
-    do_poll(log, tarch, "second", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == did_not_receive
-    assert tarch.B.received_messages == did_not_receive
-    assert tarch.C.received_messages == did_not_receive
-    assert tarch.D.received_messages == did_not_receive
-    assert tarch.E.received_messages == did_not_receive
-
-    do_poll(log, tarch, "third", MSG_WAIT_MS)
-
-    assert tarch.A.received_messages == did_not_receive
-    assert tarch.B.received_messages == did_not_receive
-    assert tarch.C.received_messages == did_not_receive
-    assert tarch.D.received_messages == did_not_receive
-    assert tarch.E.received_messages == did_not_receive
-
-
-@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-def test_linear0(linear0, loop):
-    test_msg = f"test_tarch_msgs-{loop}"
-    received_test_message = [test_msg]
-    did_not_receive = list()
-    log = logging.getLogger(f"{__name__}:lin0")
-
-    linear0.A.publish_message(test_msg)
-
-    do_poll(log, linear0, "first", MSG_WAIT_MS)
-
-    assert linear0.A.received_messages == did_not_receive
-    assert linear0.B.received_messages == received_test_message
-    assert linear0.C.received_messages == received_test_message
-    assert linear0.D.received_messages == received_test_message
-    assert linear0.E.received_messages == received_test_message
+        for node in tarch:
+            correct = did_not_receive if node is tarch.A else received_test_message
+            assert node.received_messages == correct

@@ -3,7 +3,14 @@
 # pylint: disable=redefined-outer-name
 
 import pytest
-from jzmq.msg import TaggedMessage, Tag
+from jzmq.msg import TaggedMessage, Tag, StupidMessage
+
+
+def test_no_prefix():
+    msg = StupidMessage("supz")
+    emsg = msg.encode()
+    assert emsg == (b"supz",)
+    assert repr(msg) == "StupidMessage('supz',)"
 
 
 def test_tags():

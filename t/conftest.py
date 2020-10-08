@@ -18,11 +18,13 @@ log = logging.getLogger(__name__)
 def always_true():
     return True
 
+@pytest.fixture(scope='session', params=['NOTES.txt'] + glob('t/resource/tarch/*.txt'))
+def tarch_desc(request):
+    yield t.arch.read_node_description(file=request.param)
 
 @pytest.fixture(scope="session")
-def tarch_desc():
-    return t.arch.read_node_description()
-
+def tarch_names(tarch_desc):
+    yield tuple(sorted(tarch_desc))
 
 @pytest.fixture(scope="function")
 def tarch(tarch_desc, tarch_names):
@@ -30,20 +32,15 @@ def tarch(tarch_desc, tarch_names):
 
     log.info("created tarch nodes")
     nodes = Nodes(*t.arch.generate_nodes(tarch_desc))
+    time.sleep(0.1)  # give everything an moment to connect
 
-    time.sleep(0.1)  # give everything an instant to connect
     yield nodes
 
     log.info("destroying tarch nodes")
     for node in nodes:
         node.closekill()
 
-
-@pytest.fixture(scope="session")
-def tarch_names(tarch_desc):
-    return tuple(sorted(tarch_desc))
-
-
+#################### logging filter opts
 def pytest_addoption(parser):
     """in order to disable (eg) zmq.auth when using debug loglevel:
 
@@ -58,29 +55,6 @@ def pytest_configure(config):
     for name in config.getoption("--log-disable", default=[]):
         logger = logging.getLogger(name)
         logger.propagate = False
-
-
-def _create_tarch_fixture(file):
-    base = os.path.basename(file)
-    name = base[:-4]
-    arch_desc = t.arch.read_node_description(file=file)
-    node_names = tuple(sorted(arch_desc))
-
-    def loader():
-        nodes = t.arch.generate_nodes(arch_desc)
-        ret = namedtuple(name.capitalize(), node_names)(*nodes)
-        yield ret
-        for item in ret:
-            item.closekill()
-
-    log.debug("creating fixture %s from %s", name, file)
-    globals()[name] = pytest.fixture(scope="function", name=name)(loader)
-
-
-log.debug("looking for tarch resources")
-for item in glob("t/resource/tarch/*.txt"):
-    log.debug("found tarch descriptor file %s", item)
-    _create_tarch_fixture(item)
 
 
 ######################### PROFILING
@@ -110,7 +84,7 @@ def pytest_runtest_call(item):
             funcname,
         ) = item.location  # item.name is just the function name
         profile_name = filename.split("/")[-1][:-3]
-        profile_name += "-" + funcname + ".pstats"
+        profile_name += "-" + funcname.replace('/','-') + ".pstats"
         prof_filename = os.path.join(output_dir, profile_name)
         prof_filenames.add(prof_filename)
         try:

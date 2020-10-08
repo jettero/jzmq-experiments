@@ -62,20 +62,20 @@ def read_node_description(file="NOTES.txt"):
     c = re.compile(r"\b(?P<lhs>[A-Z])\s*→\s*(?P<rhs>[A-Z])\b")
     port = 5555
     with open(file, "r") as fh:
-        port = _get_port(port)
         for line in fh:
             if "TEST_ARCH" in line:
                 for lhs, rhs in c.findall(line):
-                    if lhs not in tmp:
-                        port = _get_port(port)
-                        tmp[lhs] = Ndesc(
-                            f"tarch({lhs}):{port}",
-                            f"*:{port}",
-                            f"localhost:{port}",
-                            port,
-                            list(),
-                        )
-                        port += 10
+                    for _hs in (lhs,rhs):
+                        if _hs not in tmp:
+                            port = _get_port(port)
+                            tmp[_hs] = Ndesc(
+                                f"tarch({_hs}):{port}",
+                                f"*:{port}",
+                                f"localhost:{port}",
+                                port,
+                                list(),
+                            )
+                            port += 10
                     tmp[lhs].endpoints.append(rhs)
     return tmp
 

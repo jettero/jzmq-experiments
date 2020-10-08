@@ -8,14 +8,10 @@ TAG_RE = re.compile(r"<(.+?):(\d+|\d+\.\d+)>")
 
 
 def decode_part(x):
-    if isinstance(x, (int, float)):
-        x = str(x)
-
     try:
         x = x.decode()
     except AttributeError:
         pass
-
     return x
 
 

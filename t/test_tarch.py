@@ -6,7 +6,7 @@ import logging
 import pytest
 from jzmq import Node
 
-TEST_REPETITIONS = os.environ.get("JZMQ_TARCH_REPEAT", 2)
+TEST_REPETITIONS = os.environ.get("JZMQ_TARCH_REPEAT", 5)
 MSG_WAIT_MS = os.environ.get('JZMQ_TARCH_MSG_WAIT', 10)
 
 log = logging.getLogger(__name__)

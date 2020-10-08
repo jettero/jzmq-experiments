@@ -8,6 +8,7 @@ from jzmq import Node
 TEST_REPETITIONS = 10
 MSG_WAIT_MS = 10
 
+
 def test_tarch_desc(tarch_names, tarch_desc):
     assert tarch_names == tuple("A B C D E".split())
     assert tuple(sorted(tarch_desc)) == tarch_names
@@ -40,7 +41,7 @@ def do_poll(log, tarch, tag, wait):
             node.received_messages += res
 
 
-@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 def test_tarch_E_to_net(tarch, loop):
     test_msg = f"test_tarch_msgs-{loop}"
 
@@ -77,7 +78,7 @@ def test_tarch_E_to_net(tarch, loop):
     assert tarch.E.received_messages == did_not_receive
 
 
-@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 def test_tarch_B_to_net(tarch, loop):
     test_msg = f"test_tarch_msgs-{loop}"
 
@@ -113,7 +114,8 @@ def test_tarch_B_to_net(tarch, loop):
     assert tarch.D.received_messages == did_not_receive
     assert tarch.E.received_messages == did_not_receive
 
-@pytest.mark.parametrize('loop', range(TEST_REPETITIONS))
+
+@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 def test_linear0(linear0, loop):
     test_msg = f"test_tarch_msgs-{loop}"
     received_test_message = [test_msg]

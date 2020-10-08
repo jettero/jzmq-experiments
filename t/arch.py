@@ -56,7 +56,7 @@ def _get_port(
     )
 
 
-def read_node_description(file='NOTES.txt'):
+def read_node_description(file="NOTES.txt"):
     Ndesc = namedtuple("Ndesc", ("ident", "laddr", "raddr", "port", "endpoints"))
     tmp = dict()
     c = re.compile(r"\b(?P<lhs>[A-Z])\s*→\s*(?P<rhs>[A-Z])\b")
@@ -80,7 +80,7 @@ def read_node_description(file='NOTES.txt'):
     return tmp
 
 
-def generate_nodes(tarch_desc, file='NOTES.txt'):
+def generate_nodes(tarch_desc, file="NOTES.txt"):
     tmp = list()
 
     log.info("creating tarch nodes")
@@ -100,6 +100,6 @@ def generate_nodes(tarch_desc, file='NOTES.txt'):
     return [x for x, _ in tmp]
 
 
-def get_tarch(file='NOTES.txt'):
+def get_tarch(file="NOTES.txt"):
     desc = read_node_description(file=file)
     return generate_nodes(desc)

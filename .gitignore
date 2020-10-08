@@ -7,3 +7,4 @@ jzmq.egg-info
 build
 dist
 t/output
+.coverage

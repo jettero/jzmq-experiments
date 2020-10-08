@@ -25,7 +25,7 @@ def scrub_identity_name_for_certfile(x):
 
 
 class StupidNode:
-    pubkey = privkey = auth = None
+    pubkey = privkey = None
     channel = ""  # subscription filter or something (I think)
     PORTS = 4  # as we add or remove ports, make sure this is the number of ports a StupidNode uses
 
@@ -298,37 +298,30 @@ class StupidNode:
         sys.exit(0)
 
     def closekill(self):
-        for i in ("auth", "ctx"):
-            if not hasattr(self, i):
-                self.log.debug(
-                    "already closekilled, skipping extra closekill invocation"
-                )
-                return
-
-        self.log.debug("closekilling")
-
-        try:
-            self.log.debug("trying to stop auth thread")
-            self.auth.stop()
-            self.log.debug("auth thread seems to have stopped")
+        if hasattr(self, 'auth') and self.auth is not None:
+            if self.auth.is_alive():
+                self.log.debug("trying to stop auth thread")
+                self.auth.stop()
+                self.log.debug("auth thread seems to have stopped")
             del self.auth
-        except AttributeError:
-            self.log.debug("there does not seem to be an auth thread to stop")
 
-        if self._wai_thread and self._wai_thread.is_alive():
-            self.log.debug("WAI Thread seems to be alive, trying to join")
-            self._wai_continue = False
-            self._wai_thread.join()
-            self.log.debug("WAI Thread seems to jave joined us.")
+        if hasattr(self, '_wai_thread'):
+            if self._wai_thread.is_alive():
+                self.log.debug("WAI Thread seems to be alive, trying to join")
+                self._wai_continue = False
+                self._wai_thread.join()
+                self.log.debug("WAI Thread seems to jave joined us.")
             del self._wai_thread
 
-        self.log.debug("destroying cleartext context")
-        self.cleartext_ctx.destroy(1)
-        del self.cleartext_ctx
+        if hasattr(self, 'cleartext_ctx'):
+            self.log.debug("destroying cleartext context")
+            self.cleartext_ctx.destroy(1)
+            del self.cleartext_ctx
 
-        self.log.debug("destroying crypto context")
-        self.ctx.destroy(1)
-        del self.ctx
+        if hasattr(self, 'ctx'):
+            self.log.debug("destroying crypto context")
+            self.ctx.destroy(1)
+            del self.ctx
 
     def __del__(self):
         self.log.debug("%s is being deleted", self)

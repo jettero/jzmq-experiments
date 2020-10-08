@@ -80,7 +80,7 @@ def read_node_description(file="NOTES.txt"):
     return tmp
 
 
-def generate_nodes(tarch_desc, file="NOTES.txt"):
+def generate_nodes(tarch_desc):
     tmp = list()
 
     log.info("creating tarch nodes")

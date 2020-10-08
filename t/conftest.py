@@ -1,8 +1,10 @@
 # coding: utf-8
 # pylint: disable=redefined-outer-name
 
+import os
 import time
 import logging
+from glob import glob
 from collections import namedtuple
 import pytest
 import t.arch
@@ -54,3 +56,22 @@ def pytest_configure(config):
     for name in config.getoption("--log-disable", default=[]):
         logger = logging.getLogger(name)
         logger.propagate = False
+
+def _create_tarch_fixture(file):
+    base = os.path.basename(file)
+    name = base[:-4]
+    arch_desc = t.arch.read_node_description(file=file)
+    node_names = tuple(sorted(arch_desc))
+    def loader():
+        nodes = t.arch.generate_nodes(arch_desc)
+        ret = namedtuple(name.capitalize(), node_names)(*nodes)
+        yield ret
+        for item in ret:
+            item.closekill()
+    log.debug('creating fixture %s from %s', name, file)
+    globals()[name] = pytest.fixture(scope='function', name=name)(loader)
+
+log.debug('looking for tarch resources')
+for item in glob('t/resource/tarch/*.txt'):
+    log.debug('found tarch descriptor file %s', item)
+    _create_tarch_fixture(item)

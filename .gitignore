@@ -6,3 +6,4 @@ jzmq/__version__.py
 jzmq.egg-info
 build
 dist
+t/output

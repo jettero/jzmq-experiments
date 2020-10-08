@@ -407,7 +407,10 @@ class StupidNode:
         return s
 
     def connect_to_endpoint(self, endpoint):
-        if not isinstance(endpoint, Endpoint):
+        if isinstance(endpoint, StupidNode):
+            endpoint = endpoint.endpoint
+
+        elif not isinstance(endpoint, Endpoint):
             endpoint = Endpoint(endpoint)
 
         self.log.debug("learning or loading endpoint=%s pubkey", endpoint)

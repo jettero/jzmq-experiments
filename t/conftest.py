@@ -31,7 +31,7 @@ def tarch(tarch_desc, tarch_names):
     log.info("created tarch nodes")
     nodes = Nodes(*t.arch.generate_nodes(tarch_desc))
 
-    time.sleep(1)  # give everything a sec to connect
+    time.sleep(0.1)  # give everything an instant to connect
     yield nodes
 
     log.info("destroying tarch nodes")

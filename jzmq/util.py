@@ -6,6 +6,8 @@ import logging
 import socket
 import zmq
 
+from .const import *
+
 # NOTE: I'd really rather use a definition from zmq for this list of
 # candidates...  or better yet, a built in that can translate back form
 # numbers to the constant name...
@@ -119,20 +121,23 @@ class MyRE:
 
 
 def check_ports(
-    port, count, bind_addr4="127.0.0.1", bind_addr6="::1", refuse_after=5, proto="tcp"
+    ports=DEFAULT_PORTS,
+    bind_addr4="127.0.0.1",
+    bind_addr6="::1",
+    refuse_after=5,
+    proto=DEFAULT_PROTO,
 ):
     if proto.lower() == "udp":
         proto = socket.SOCK_DGRAM
     elif proto.lower() == "tcp":
         proto = socket.SOCK_STREAM
 
-    if not isinstance(proto, socket.SocketKind): # pylint: disable=no-member
+    if not isinstance(proto, socket.SocketKind):  # pylint: disable=no-member
         raise TypeError(
             "try proto='udp'/proto='tcp' or a socket.SocketKind (eg socket.SOCK_STREAM)"
         )
 
-    prange = list(range(port, port + count))
-    for p in prange:
+    for p in ports:
         try:
             sock = socket.socket(socket.AF_INET, proto)
             sock.bind((bind_addr4, p))
@@ -145,10 +150,33 @@ def check_ports(
         except socket.error as e:
             log.info(
                 "portrange %d-%d seems to be in use (or something) at %d: %s",
-                prange[0],
-                prange[1],
-                port,
+                ports[0],
+                ports[-1],
+                p,
                 e,
             )
             return False
     return True
+
+
+def increment_ports(ports):
+    """ try to increment the given ports in such a way that they keep the same inter-spacing """
+
+    def weird():
+        m = max(ports)
+        for i in (1,) + tuple(y - x for x, y in zip(ports, ports[1:])):
+            m = m + i
+            yield m
+
+    return tuple(weird())
+
+
+def get_ports(ports=DEFAULT_PORTS, proto=DEFAULT_PROTO, max_tries=10):
+    oports = ports
+    for _ in range(max_tries):
+        if check_ports(ports, proto=proto):
+            return ports
+        ports = increment_ports(ports)
+    raise Exception(
+        f"unable to find a set of ports starting at {oports} (ending near {ports})"
+    )

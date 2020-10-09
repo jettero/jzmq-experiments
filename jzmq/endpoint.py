@@ -3,18 +3,7 @@
 import re
 import zmq
 from .util import MyRE
-
-DEFAULT_PUBLISH_PORT = 5555
-DEFAULT_COLLECTOR_PORT = 5556
-DEFAULT_DIRECTED_PORT = 5557
-DEFAULT_CLEARTEXT_PORT = 5558
-
-DEFAULT_PROTO = "tcp"
-
-DEFAULT_PORTS = (DEFAULT_PUBLISH_PORT, DEFAULT_COLLECTOR_PORT, DEFAULT_DIRECTED_PORT)
-DEFAULT_PORT_STRING = ",".join([str(x) for x in DEFAULT_PORTS])
-
-DEFAULT_ENDPOINT = f"{DEFAULT_PROTO}://*:{DEFAULT_PORT_STRING}"
+from .const import *
 
 _slurpies = (
     MyRE(
@@ -24,26 +13,26 @@ _slurpies = (
 
 
 class Endpoint:
-    """ Describe an endpoint
+    """Describe an endpoint
 
-        The single argument 'description' is any of the following
+    The single argument 'description' is any of the following
 
-        * a hostname (or a star, etc)
-        * an IP address
-        * an address and port pair (e.g. host:5555)
-        * an address and port list (e.g., host:5555,5556,5557)
-        * a whole URL (e.g., tcp://host:555), which can also have a port list
+    * a hostname (or a star, etc)
+    * an IP address
+    * an address and port pair (e.g. host:5555)
+    * an address and port list (e.g., host:5555,5556,5557)
+    * a whole URL (e.g., tcp://host:555), which can also have a port list
 
-        Any specified ports drop into slots in this order:
+    Any specified ports drop into slots in this order:
 
-        * PUBLISH_PORT (default 5555)
-        * COLLECTOR_PORT (default 5556)
-        * DIRECTED_PORT (default 5557)
+    * PUBLISH_PORT (default 5555)
+    * COLLECTOR_PORT (default 5556)
+    * DIRECTED_PORT (default 5557)
 
-        If any but not all ports are specified in the endpoint string, the next
-        values in the series are incremented from the last specified.  That is,
-        'host:80' implies 'host:80,81,82' and 'host:80,85' implies
-        'host:80,85,86'.
+    If any but not all ports are specified in the endpoint string, the next
+    values in the series are incremented from the last specified.  That is,
+    'host:80' implies 'host:80,81,82' and 'host:80,85' implies
+    'host:80,85,86'.
     """
 
     host = "localhost"

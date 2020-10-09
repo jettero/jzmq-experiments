@@ -4,7 +4,7 @@ disable=missing-docstring, multiple-imports, invalid-name, bad-whitespace,
     too-few-public-methods, broad-except, fixme, too-many-public-methods,
     too-many-branches, bad-continuation, too-many-nested-blocks,
     global-statement, inconsistent-return-statements, bad-reversed-sequence,
-    superfluous-parens,no-self-use
+    superfluous-parens,no-self-use,unused-wildcard-import,wildcard-import
 
 persistent=yes
 cache-size=500

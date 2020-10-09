@@ -21,7 +21,8 @@ def jzmq_node_tasks(node):
 
 class ChatNode(Node):
     def nonlocal_react(self, msg, idx=None):
-        if msg.msg == "* enter":
+        msg = super().nonlocal_react(msg, idx=idx)
+        if msg and msg.msg == "* enter":
             self.route_message(msg.tag.name, "* is here")
         return msg
 

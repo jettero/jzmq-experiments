@@ -2,6 +2,8 @@
 # coding: utf-8
 
 import re
+import logging
+import socket
 import zmq
 
 # NOTE: I'd really rather use a definition from zmq for this list of
@@ -41,6 +43,8 @@ ZMQ_SOCKET_TYPE_NAMES = (
     "SCATTER",
     "DGRAM",
 )
+
+log = logging.getLogger(__name__)
 
 
 def zmq_socket_type_name(socket_type_number):
@@ -112,3 +116,39 @@ class MyRE:
             if h:
                 ret += f" named_groups={h}"
         return ret + ")"
+
+
+def check_ports(
+    port, count, bind_addr4="127.0.0.1", bind_addr6="::1", refuse_after=5, proto="tcp"
+):
+    if proto.lower() == "udp":
+        proto = socket.SOCK_DGRAM
+    elif proto.lower() == "tcp":
+        proto = socket.SOCK_STREAM
+
+    if not isinstance(proto, socket.SocketKind): # pylint: disable=no-member
+        raise TypeError(
+            "try proto='udp'/proto='tcp' or a socket.SocketKind (eg socket.SOCK_STREAM)"
+        )
+
+    prange = list(range(port, port + count))
+    for p in prange:
+        try:
+            sock = socket.socket(socket.AF_INET, proto)
+            sock.bind((bind_addr4, p))
+            sock.listen(refuse_after)
+            sock.close()
+            sock = socket.socket(socket.AF_INET6, proto)
+            sock.bind((bind_addr6, p))
+            sock.listen(refuse_after)
+            sock.close()
+        except socket.error as e:
+            log.info(
+                "portrange %d-%d seems to be in use (or something) at %d: %s",
+                prange[0],
+                prange[1],
+                port,
+                e,
+            )
+            return False
+    return True

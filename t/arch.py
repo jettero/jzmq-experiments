@@ -3,9 +3,9 @@
 
 import re
 import logging
-import socket
 from collections import namedtuple
 from jzmq import Node
+from jzmq.util import check_ports
 
 log = logging.getLogger(__name__)
 
@@ -13,30 +13,6 @@ TEST_PORT = 5555
 TARCH_NODE_COUNT = 7  # there's actually only 4 in NOTES.txt, leave some space
 TEST_PORT_INCREMENT = TARCH_NODE_COUNT * Node.PORTS
 FIND_PORT_MAX_TRIES = 7
-
-
-def _check_ports(port, count=Node.PORTS):
-    prange = (port, port + Node.PORTS)
-    for _ in range(port, port + count):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind(("127.0.0.1", port))
-            sock.listen(5)
-            sock.close()
-            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-            sock.bind(("::1", port))
-            sock.listen(5)
-            sock.close()
-        except socket.error as e:
-            log.info(
-                "portrange %d-%d seems to be in use (or something) at %d: %s",
-                prange[0],
-                prange[1],
-                port,
-                e,
-            )
-            return False
-    return True
 
 
 def _get_port(
@@ -47,7 +23,7 @@ def _get_port(
 ):
     ostart = start
     for _ in range(max_tries):
-        if _check_ports(start, count=count):
+        if check_ports(start, count=count):
             return start
         start += increment
     raise Exception(

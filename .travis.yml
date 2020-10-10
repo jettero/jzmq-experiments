@@ -10,6 +10,9 @@ install:
   - pip install --upgrade -r test-requirements.txt
   - pip install --upgrade pre-commit
 
+env:
+ - TRAVIS_SKIP=1
+
 script:
   - ip addr show
   - pre-commit run -a

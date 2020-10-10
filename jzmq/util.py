@@ -127,10 +127,10 @@ def check_ports(
     bind_addr4="127.0.0.1",
     bind_addr6="::1",
     refuse_after=5,
-    sleep_after_check=os.environ.get('JZMQ_PORT_CHECK_SLEEP'),
+    sleep_after_check=os.environ.get("JZMQ_PORT_CHECK_SLEEP"),
     proto=DEFAULT_PROTO,
-    check_inet4=not os.environ.get('JZMQ_SKIP_INET4_PORT_CHECKS'),
-    check_inet6=not os.environ.get('JZMQ_SKIP_INET6_PORT_CHECKS'),
+    check_inet4=not os.environ.get("JZMQ_SKIP_INET4_PORT_CHECKS"),
+    check_inet6=not os.environ.get("JZMQ_SKIP_INET6_PORT_CHECKS"),
 ):
     try:
         sleep_after_check = float(sleep_after_check)
@@ -171,7 +171,10 @@ def check_ports(
         finally:
             if sleep_after_check > 0:
                 # this happens whether we return False (except:above) or True (below)
-                log.info('sleeping for %s seconds to free up checked ports', sleep_after_check)
+                log.info(
+                    "sleeping for %s seconds to free up checked ports",
+                    sleep_after_check,
+                )
                 time.sleep(sleep_after_check)
     return True
 

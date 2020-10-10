@@ -30,7 +30,7 @@ repos:
     types: [python]
   - id: pytest
     name: pytest
-    entry: ./pathed-pylintest pytest t
+    entry: ./pathed-pylintest pytest --log-cli-level info t --log-disable zmq.auth
     always_run: true
     language: system
     pass_filenames: false

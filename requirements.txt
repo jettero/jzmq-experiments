@@ -1,5 +1,6 @@
 pyzmq
 click
+pytest
 prompt_toolkit
 pytest-cov
 pytest-pythonpath

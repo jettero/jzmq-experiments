@@ -2,6 +2,8 @@
 # coding: utf-8
 
 import re
+import os
+import time
 import logging
 import socket
 import zmq
@@ -125,8 +127,16 @@ def check_ports(
     bind_addr4="127.0.0.1",
     bind_addr6="::1",
     refuse_after=5,
+    sleep_after_check=os.environ.get('JZMQ_PORT_CHECK_SLEEP'),
     proto=DEFAULT_PROTO,
+    check_inet4=not os.environ.get('JZMQ_SKIP_INET4_PORT_CHECKS'),
+    check_inet6=not os.environ.get('JZMQ_SKIP_INET6_PORT_CHECKS'),
 ):
+    try:
+        sleep_after_check = float(sleep_after_check)
+    except:
+        sleep_after_check = 0
+
     if proto.lower() == "udp":
         proto = socket.SOCK_DGRAM
     elif proto.lower() == "tcp":
@@ -139,14 +149,16 @@ def check_ports(
 
     for p in ports:
         try:
-            sock = socket.socket(socket.AF_INET, proto)
-            sock.bind((bind_addr4, p))
-            sock.listen(refuse_after)
-            sock.close()
-            sock = socket.socket(socket.AF_INET6, proto)
-            sock.bind((bind_addr6, p))
-            sock.listen(refuse_after)
-            sock.close()
+            if check_inet4:
+                sock = socket.socket(socket.AF_INET, proto)
+                sock.bind((bind_addr4, p))
+                sock.listen(refuse_after)
+                sock.close()
+            if check_inet6:
+                sock = socket.socket(socket.AF_INET6, proto)
+                sock.bind((bind_addr6, p))
+                sock.listen(refuse_after)
+                sock.close()
         except socket.error as e:
             log.info(
                 "portrange %d-%d seems to be in use (or something) at %d: %s",
@@ -156,6 +168,11 @@ def check_ports(
                 e,
             )
             return False
+        finally:
+            if sleep_after_check > 0:
+                # this happens whether we return False (except:above) or True (below)
+                log.info('sleeping for %s seconds to free up checked ports', sleep_after_check)
+                time.sleep(sleep_after_check)
     return True
 
 

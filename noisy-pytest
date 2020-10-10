@@ -4,4 +4,6 @@ if [ $# = 0 ]
 then set -- t/
 fi
 
-python -m pytest --log-cli-level debug "$@" --log-disable zmq.auth
+NOISE_LEVEL="${NOISE_LEVEL:-debug}"
+
+python -m pytest --log-cli-level "$NOISE_LEVEL" "$@" --log-disable zmq.auth

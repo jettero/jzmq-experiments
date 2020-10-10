@@ -185,7 +185,7 @@ def increment_ports(ports):
     def weird():
         m = max(ports)
         for i in (1,) + tuple(y - x for x, y in zip(ports, ports[1:])):
-            m = m + i
+            m += i
             yield m
 
     return tuple(weird())

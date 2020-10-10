@@ -5,7 +5,7 @@ import re
 import logging
 from collections import namedtuple
 from jzmq import Node
-from jzmq.util import get_ports, increment_ports
+from jzmq.util import get_ports, increment_ports, DEFAULT_PORTS
 
 log = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ def read_node_description(file="NOTES.txt"):
     Ndesc = namedtuple("Ndesc", ("ident", "laddr", "raddr", "endpoints"))
     tmp = dict()
     c = re.compile(r"\b(?P<lhs>[A-Z])\s*→\s*(?P<rhs>[A-Z])\b")
-    ports = get_ports()
+    ports = DEFAULT_PORTS
     with open(file, "r") as fh:
         for line in fh:
             if "TEST_ARCH" in line:

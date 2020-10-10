@@ -58,7 +58,7 @@ class PollWrapper:
             del node.received_messages
 
 
-@pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"))
+@pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"), reason="network disabled")
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 def test_publish_from_A(tarch, loop):
     test_msg = f"test_msg({loop})"

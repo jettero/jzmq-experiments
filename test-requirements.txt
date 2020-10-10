@@ -1,0 +1,9 @@
+-r requirements.txt
+
+hypothesis
+pylint
+pytest
+pytest-cov
+pytest-pythonpath
+pytest-html
+pytest-timeout

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import re
 from time import time as now
+from jzmq.util import MyRE
 
-TAG_RE = re.compile(r"<(.+?):(\d+|\d+\.\d+)>")
+TAG_RE = MyRE(r"<(.+?):(\d+|\d+\.\d+)>")
 
 
 def decode_part(x):
@@ -68,10 +68,9 @@ class TaggedMessage(StupidMessage):
             if isinstance(self[0], Tag):
                 self.tag = Tag(self[0].name, self[1].time)
             else:
-                m = TAG_RE.match(self[0])
-                if m:
+                if isinstance(self[0], str) and TAG_RE.match(self[0]):
                     self.pop(0)
-                    self.tag = Tag(m.group(1), m.group(2))
+                    self.tag = Tag(TAG_RE.group(1), TAG_RE.group(2))
                 else:
                     self.tag = Tag(name)
 
@@ -100,3 +99,15 @@ class TaggedMessage(StupidMessage):
     @property
     def name(self):
         return self.tag.name
+
+class RoutedMessage(TaggedMessage):
+    def __init__(self, to, *parts, **kw):
+        super().__init__(*parts, **kw)
+        self.to = to
+
+    def encode(self, *a, **kw):
+        # we want TaggedMessage's ancestor, not RoutedMessage's ancestor
+        return super(TaggedMessage, self).encode(*a, prefix=(self.to, self.tag), **kw)
+
+    def __repr__(self):
+        return f"RoutedMessage[{self.tag}]{tuple(self)} -> {self.to}"

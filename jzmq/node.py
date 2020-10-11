@@ -11,12 +11,12 @@ from socket import gethostname
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
-from .msg import TaggedMessage, StupidMessage
+from .msg import TaggedMessage, RoutedMessage
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
-
+BROADCAST_PREFIX = '!BCAST!'
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -49,6 +49,7 @@ class StupidNode:
 
         self.pub = self.mk_socket(zmq.PUB)
         self.router = self.mk_socket(zmq.ROUTER)
+        self.router.router_mandatory = 1 # one of the few opts that can be set after bind()
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
         self.sub = list()
@@ -121,22 +122,35 @@ class StupidNode:
             zmq.auth.create_certificates(self.keyring, self.key_basename)
             self.load_key()
 
-    def preprocess_message(self, msg):
-        if not isinstance(msg, TaggedMessage):
-            msg = TaggedMessage(msg, name=self.identity)
+    def preprocess_message(self, msg, msg_class=TaggedMessage, name=None):
+        if not isinstance(msg, msg_class):
+            if not isinstance(msg, (list,tuple)):
+                msg = (msg,)
+            if name is None:
+                name = self.identity
+            msg = msg_class(*msg, name=name)
         rmsg = repr(msg)
         emsg = msg.encode()
         return msg, rmsg, emsg
 
-    def route_message(self, to, msg):
-        msg, rmsg, emsg = self.preprocess_message(msg)
-        self.log.debug("routing message %s to %s", rmsg, to)
-        emsg = StupidMessage(to).encode() + emsg
-        self.router.send_multipart(emsg)
+    def route_message(self, to, msg, name=None):
+        if isinstance(msg, (list,tuple)):
+            msg = (to,) + tuple(msg)
+        else:
+            msg = (to, msg)
+        tmsg, rmsg, emsg = self.preprocess_message(msg, msg_class=RoutedMessage, name=name)
+        self.log.debug("routing message %s", rmsg)
+        try:
+            self.router.send_multipart(emsg)
+        except zmq.error.ZMQError as zmq_e:
+            self.log.debug("route to %s failed: %s", to, zmq_e)
+            if "Host unreachable" not in str(zmq_e):
+                raise
+            self.publish_message((BROADCAST_PREFIX,) + msg)
 
     def publish_message(self, msg, no_deal=False, no_deal_to=None):
-        msg, rmsg, emsg = self.preprocess_message(msg)
-        self.local_workflow(msg)
+        tmsg, rmsg, emsg = self.preprocess_message(msg)
+        self.local_workflow(tmsg)
         self.log.debug("publishing message %s", rmsg)
         self.pub.send_multipart(emsg)
         if no_deal:
@@ -202,11 +216,20 @@ class StupidNode:
             msg = self.all_react(msg)
         return msg
 
+    def handle_broadcast(self, msg):
+        if len(msg)>0 and msg[0] == BROADCAST_PREFIX:
+            if len(msg) >= 3:
+                self.route_message(msg[1], msg[2:], name=msg.tag.name)
+            return True
+        return False
+
     def sub_workflow(self, socket):
         idx = self.sub.index(socket)
         enp = self.endpoints[idx]
         self.log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.sub_receive(socket, idx)
+        if self.handle_broadcast(msg):
+            return False
         for react in (self.nonlocal_react, self.all_react):
             if msg:
                 msg = react(msg, idx=idx)
@@ -228,6 +251,8 @@ class StupidNode:
         enp = self.endpoints[idx]
         self.log.debug("start deal_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.dealer_receive(socket, idx)
+        if self.handle_broadcast(msg):
+            return False
         for react in (self.nonlocal_react, self.all_react):
             if not msg:
                 break

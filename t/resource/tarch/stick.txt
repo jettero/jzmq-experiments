@@ -1,2 +1,5 @@
 TEST_ARCH    A → B, B → C
 TEST_ARCH    C → D, D → E
+
+TEST_ARCH    MSG(A:B,C,D,E)
+TEST_ARCH    MSG(E:A,B,C,D)

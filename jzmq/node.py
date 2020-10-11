@@ -133,7 +133,7 @@ class StupidNode:
         emsg = msg.encode()
         return msg, rmsg, emsg
 
-    def route_message(self, to, msg, name=None):
+    def route_message(self, to, msg, name=None, unreach_ok=False):
         if isinstance(msg, (list,tuple)):
             msg = (to,) + tuple(msg)
         else:
@@ -146,7 +146,8 @@ class StupidNode:
             self.log.debug("route to %s failed: %s", to, zmq_e)
             if "Host unreachable" not in str(zmq_e):
                 raise
-            self.publish_message((BROADCAST_PREFIX,) + msg)
+            if not unreach_ok:
+                self.publish_message((BROADCAST_PREFIX,) + msg)
 
     def publish_message(self, msg, no_deal=False, no_deal_to=None):
         tmsg, rmsg, emsg = self.preprocess_message(msg)
@@ -219,7 +220,7 @@ class StupidNode:
     def handle_broadcast(self, msg):
         if len(msg)>0 and msg[0] == BROADCAST_PREFIX:
             if len(msg) >= 3:
-                self.route_message(msg[1], msg[2:], name=msg.tag.name)
+                self.route_message(msg[1], msg[2:], name=msg.tag.name, unreach_ok=True)
             return True
         return False
 

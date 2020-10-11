@@ -5,6 +5,7 @@ import sys, signal
 import re
 import logging
 import time
+from collections import deque
 from threading import Thread
 from socket import gethostname
 
@@ -15,7 +16,9 @@ from .msg import TaggedMessage, RoutedMessage
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
+ROUTE_QUEUE_LEN = 10
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
+BROADCAST_PREFIX = '!BCAST!'
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -72,6 +75,8 @@ class StupidNode:
         self._wai_thread = Thread(target=self.wai_reply_machine)
         self._wai_continue = True
         self._wai_thread.start()
+
+        self.route_queue = deque(list(), ROUTE_QUEUE_LEN)
 
         self.log.debug("node setup complete")
 
@@ -130,7 +135,12 @@ class StupidNode:
         emsg = msg.encode()
         return msg, rmsg, emsg
 
-    def route_message(self, to, msg, name=None):
+    def route_failed(self, msg):
+        if not isinstance(msg, RoutedMessage):
+            raise TypeError("msg must already be a RoutedMessage")
+        self.route_queue.append(msg)
+
+    def route_message(self, to, msg):
         if isinstance(msg, RoutedMessage):
             msg.to = to
         elif isinstance(msg, (list,tuple)):
@@ -145,6 +155,7 @@ class StupidNode:
             self.log.error("route to %s failed: %s", to, zmq_e)
             if "Host unreachable" not in str(zmq_e):
                 raise
+            self.route_failed(tmsg)
 
     def publish_message(self, msg, no_deal=False, no_deal_to=None):
         tmsg, rmsg, emsg = self.preprocess_message(msg)
@@ -473,4 +484,11 @@ class RelayNode(StupidNode):
         if self.is_repeat(msg):
             return False
         self.publish_message(msg, no_deal_to=idx)
+        if msg[0] == BROADCAST_PREFIX:
+            if msg[1] == "where is" and msg[2] == self.identity:
+                self.log.error("TODO HERE I AM TODO")
+            return False
         return msg
+
+    def route_failed(self, msg):
+        self.publish_message((BROADCAST_PREFIX, "where is", msg.to))

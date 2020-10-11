@@ -80,7 +80,17 @@ def chat(
                 break
 
             if line and line.strip():
-                node.publish_message(line)
+                if line.startswith('/'):
+                    if len(line) > 1:
+                        cmd,*args = line[1:].split()
+                        if cmd == 'whisper' and len(args) > 1:
+                            target, *args = args
+                            node.route_message(target, args)
+                            continue
+                    print("/whisper target message")
+                    print('/help: this help')
+                else:
+                    node.publish_message(line)
 
     node.publish_message("* exit")
     ALIVE = False

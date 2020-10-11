@@ -13,6 +13,7 @@ import t.arch
 
 log = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def always_true():
     return True
@@ -20,7 +21,7 @@ def always_true():
 
 @pytest.fixture(scope="session", params=["NOTES.txt"] + glob("t/resource/tarch/*.txt"))
 def tarch_desc(request):
-    TarchDesc = namedtuple('TarchDesc', ('arch', 'tests'))
+    TarchDesc = namedtuple("TarchDesc", ("arch", "tests"))
     yield TarchDesc(*t.arch.read_tarch_description(file=request.param))
 
 
@@ -28,9 +29,11 @@ def tarch_desc(request):
 def tarch_names(tarch_desc):
     yield tuple(sorted(tarch_desc.arch))
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def tarch_tests(tarch_desc):
     yield tarch_desc.tests
+
 
 @pytest.fixture(scope="function")
 def tarch(tarch_desc, tarch_names):

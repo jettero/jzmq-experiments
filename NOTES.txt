@@ -23,4 +23,6 @@
     - let's write some tests…
       - we'll have MSG(source:target0,target1) mean
         source->publish_message() should reach nodes target0 and target1
-      - TEST_ARCH: MSG(A:B,C,D)
+      - TEST_ARCH: MSG(A:B,C,D,E)
+      - TEST_ARCH: MSG(B:A,C,D,E)
+      - TEST_ARCH: MSG(E:A,B,C,D)

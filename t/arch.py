@@ -18,8 +18,10 @@ def read_tarch_description(file="NOTES.txt"):
     node_map = dict()
     test_list = list()
     node_connection_re = re.compile(r"\b(?P<lhs>[A-Z])\s*→\s*(?P<rhs>[A-Z])\b")
-    test_description_re = re.compile(r'MSG(?:<(?P<msg_tag>[^<>]*?)>)?\((?P<source>[^:]+?):(?P<recipients>.+?)\)')
-    rsplit_re = re.compile(r'\s*,\s*')
+    test_description_re = re.compile(
+        r"MSG(?:<(?P<msg_tag>[^<>]*?)>)?\((?P<source>[^:]+?):(?P<recipients>.+?)\)"
+    )
+    rsplit_re = re.compile(r"\s*,\s*")
     with open(file, "r") as fh:
         for line in fh:
             if "TEST_ARCH" in line:
@@ -35,11 +37,11 @@ def read_tarch_description(file="NOTES.txt"):
                                 list(),
                             )
                     node_map[lhs].endpoints.append(rhs)
-                for msg,source,recipients in test_description_re.findall(line):
+                for msg, source, recipients in test_description_re.findall(line):
                     if not msg:
                         msg = "message"
                     recipients = rsplit_re.split(recipients)
-                    test_list.append( Tdesc(msg, source, recipients) )
+                    test_list.append(Tdesc(msg, source, recipients))
     return node_map, test_list
 
 
@@ -64,5 +66,5 @@ def generate_nodes(tarch_desc):
 
 
 def get_tarch(file="NOTES.txt"):
-    tarch_desc,test_desc = read_tarch_description(file=file)
+    tarch_desc, test_desc = read_tarch_description(file=file)
     return generate_nodes(tarch_desc), test_desc

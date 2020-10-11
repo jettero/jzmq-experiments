@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import os
 import threading
 import logging
 import click
@@ -35,7 +36,7 @@ class ChatNode(Node):
 @click.option("-i", "--identity", type=str, help="[default <hostname>-<baseport>]")
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
-@click.option("--vi-input/--emacs-input", "vi_mode", default=False)
+@click.option("--vi-input/--emacs-input", "vi_mode", default=os.environ.get("JZMQ_VI_MODE"))
 def chat(
     laddr, raddr, identity, verbosity, keyring, vi_mode
 ):  # pylint: disable=unused-argument

@@ -13,7 +13,6 @@ import t.arch
 
 log = logging.getLogger(__name__)
 
-
 @pytest.fixture
 def always_true():
     return True
@@ -21,20 +20,24 @@ def always_true():
 
 @pytest.fixture(scope="session", params=["NOTES.txt"] + glob("t/resource/tarch/*.txt"))
 def tarch_desc(request):
-    yield t.arch.read_node_description(file=request.param)
+    TarchDesc = namedtuple('TarchDesc', ('arch', 'tests'))
+    yield TarchDesc(*t.arch.read_tarch_description(file=request.param))
 
 
 @pytest.fixture(scope="session")
 def tarch_names(tarch_desc):
-    yield tuple(sorted(tarch_desc))
+    yield tuple(sorted(tarch_desc.arch))
 
+@pytest.fixture(scope='session')
+def tarch_tests(tarch_desc):
+    yield tarch_desc.tests
 
 @pytest.fixture(scope="function")
 def tarch(tarch_desc, tarch_names):
     Nodes = namedtuple("Nodes", tarch_names)
 
     log.info("created tarch nodes")
-    nodes = Nodes(*t.arch.generate_nodes(tarch_desc))
+    nodes = Nodes(*t.arch.generate_nodes(tarch_desc.arch))
     time.sleep(0.1)  # give everything an moment to connect
 
     yield nodes

@@ -14,10 +14,10 @@ log = logging.getLogger(__name__)
 
 def test_tarch_desc(tarch_names, tarch_desc):
     assert 0 < len(tarch_names) < 100
-    assert tuple(sorted(tarch_desc)) == tarch_names
+    assert tuple(sorted(tarch_desc.arch)) == tarch_names
 
     for k in tarch_names:
-        for item in tarch_desc[k].endpoints:
+        for item in tarch_desc.arch[k].endpoints:
             assert item in tarch_names
 
 

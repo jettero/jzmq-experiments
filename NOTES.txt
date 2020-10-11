@@ -7,12 +7,10 @@
 
 - when jzmq.cmd receives a line of input, what should happen?
   - we'll need a decentralized infrastructure to talk about this I guess
-  - in "A → B", say the arrow indicates A connecting to B, which implies
-    all the channels we expect in the StupidNode object... A will subscribe
-    to B's PUB socket, A's PUSH socket will connect to B's PULL socket,
-    etc.
-  - So, in our test architecture, let's have 5 nodes (A-E), each connected to two
-    others and try to come up with as much path variety as possible... hrm.
+  - in "A → B", say the arrow indicates A connecting to B
+  - So, in our test architecture, let's have 5 nodes (A,…,E), each
+    connected to two others and try to come up with as much path variety as
+    possible... hrm.
     - We definitely want to see graph cycles
     - and symmetry (A→B, B→A)
     - and "Isolated" nodes: meaning if they PUBlish, there's no subscribers
@@ -22,3 +20,7 @@
       TEST_ARCH    C → A, C → D
       TEST_ARCH    D → A, D → B
       TEST_ARCH    E → C
+    - let's write some tests…
+      - we'll have MSG(source:target0,target1) mean
+        source->publish_message() should reach nodes target0 and target1
+      - TEST_ARCH: MSG(A:B,C,D)

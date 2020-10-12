@@ -3,7 +3,7 @@
 # pylint: disable=redefined-outer-name
 
 import pytest
-from jzmq.msg import TaggedMessage, Tag, StupidMessage
+from jzmq.msg import TaggedMessage, Tag, StupidMessage, RoutedMessage
 
 
 def test_no_prefix():
@@ -57,3 +57,17 @@ def test_m0d(m0, m0d):
     assert m0 == m0d
     assert m0.name == m0d.name
     assert m0.time == m0d.time
+
+
+def test_rm():
+    dest0 = "to-thing"
+    parts = ("msg_part0", "msg_part1")
+    rm0 = RoutedMessage(dest0, *parts)
+    assert rm0.to == (dest0,)
+    assert rm0.tag not in parts
+    assert tuple(rm0) == parts
+
+    rm1 = RoutedMessage.decode(rm0.encode())
+    assert rm0.to == rm1.to
+    assert rm0.tag == rm1.tag
+    assert tuple(rm0) == tuple(rm1)

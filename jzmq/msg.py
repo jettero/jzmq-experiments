@@ -16,6 +16,8 @@ def decode_part(x):
 
 
 class StupidMessage(list):
+    publish_mark = True
+
     def __init__(self, *parts):
         super().__init__(decode_part(x) for x in parts)
 
@@ -34,6 +36,10 @@ class StupidMessage(list):
 
 class Tag:
     def __init__(self, name, time=None):
+        if TAG_RE.match(name):
+            name = TAG_RE.group(1)
+            if time is None:
+                time = TAG_RE.group(2)
         self.name = name
         try:
             self.time = float(time)
@@ -66,11 +72,12 @@ class TaggedMessage(StupidMessage):
             self.tag = Tag(name)
         else:
             if isinstance(self[0], Tag):
-                self.tag = Tag(self[0].name, self[1].time)
+                self.tag = Tag(self[0].name, self[0].time)
+                self.pop(0)
             else:
                 if isinstance(self[0], str) and TAG_RE.match(self[0]):
-                    self.pop(0)
                     self.tag = Tag(TAG_RE.group(1), TAG_RE.group(2))
+                    self.pop(0)
                 else:
                     self.tag = Tag(name)
 
@@ -100,14 +107,51 @@ class TaggedMessage(StupidMessage):
     def name(self):
         return self.tag.name
 
+
 class RoutedMessage(TaggedMessage):
+    @classmethod
+    def decode(cls, parts):
+        route_parts = list()
+        tag = None
+        msg_parts = list()
+
+        for part in parts:
+            part = decode_part(part)
+            if tag:
+                msg_parts.append(part)
+            elif TAG_RE.match(part):
+                tag = Tag(TAG_RE.group(1), TAG_RE.group(2))
+            else:
+                route_parts.append(part)
+
+        if route_parts and tag and msg_parts:
+            return cls(route_parts, *([tag] + msg_parts))
+
     def __init__(self, to, *parts, **kw):
         super().__init__(*parts, **kw)
         self.to = to
+        self.failures = 0
+
+    @property
+    def to(self):
+        return self._to
+
+    @to.setter
+    def to(self, v):
+        if isinstance(v, list):
+            v = tuple(v)
+        elif not isinstance(v, tuple):
+            v = (v,)
+        self._to = v
+
+    @property
+    def prefix(self):
+        return self.to + (self.tag,)
 
     def encode(self, *a, **kw):
         # we want TaggedMessage's ancestor, not RoutedMessage's ancestor
-        return super(TaggedMessage, self).encode(*a, prefix=(self.to, self.tag), **kw)
+        # pylint: disable=bad-super-call
+        return super(TaggedMessage, self).encode(*a, prefix=self.prefix, **kw)
 
     def __repr__(self):
         return f"RoutedMessage[{self.tag}]{tuple(self)} -> {self.to}"

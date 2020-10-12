@@ -36,7 +36,9 @@ class ChatNode(Node):
 @click.option("-i", "--identity", type=str, help="[default <hostname>-<baseport>]")
 @click.option("-l", "--local-address", "laddr", default="*", show_default=True)
 @click.option("-r", "--remote-address", "raddr", multiple=True, default=list())
-@click.option("--vi-input/--emacs-input", "vi_mode", default=os.environ.get("JZMQ_VI_MODE"))
+@click.option(
+    "--vi-input/--emacs-input", "vi_mode", default=os.environ.get("JZMQ_VI_MODE")
+)
 def chat(
     laddr, raddr, identity, verbosity, keyring, vi_mode
 ):  # pylint: disable=unused-argument
@@ -81,15 +83,15 @@ def chat(
                 break
 
             if line and line.strip():
-                if line.startswith('/'):
+                if line.startswith("/"):
                     if len(line) > 1:
-                        cmd,*args = line[1:].split()
-                        if cmd == 'whisper' and len(args) > 1:
+                        cmd, *args = line[1:].split()
+                        if cmd == "whisper" and len(args) > 1:
                             target, *args = args
                             node.route_message(target, args)
                             continue
                     print("/whisper target message")
-                    print('/help: this help')
+                    print("/help: this help")
                 else:
                     node.publish_message(line)
 

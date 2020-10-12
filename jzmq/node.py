@@ -12,13 +12,14 @@ from socket import gethostname
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
 
-from .msg import TaggedMessage, RoutedMessage
+from .msg import TaggedMessage, RoutedMessage, Tag
 from .util import zmq_socket_type_name
 from .endpoint import Endpoint
 
 ROUTE_QUEUE_LEN = 10
 DEFAULT_KEYRING = os.path.expanduser(os.path.join("~", ".config", "jzmq", "keyring"))
-BROADCAST_PREFIX = '!BCAST!'
+BROADCAST_PREFIX = "!BCAST!"
+
 
 def scrub_identity_name_for_certfile(x):
     if isinstance(x, (bytes, bytearray)):
@@ -51,7 +52,9 @@ class StupidNode:
 
         self.pub = self.mk_socket(zmq.PUB)
         self.router = self.mk_socket(zmq.ROUTER)
-        self.router.router_mandatory = 1 # one of the few opts that can be set after bind()
+        self.router.router_mandatory = (
+            1  # one of the few opts that can be set after bind()
+        )
         self.rep = self.mk_socket(zmq.REP, enable_curve=False)
 
         self.sub = list()
@@ -77,6 +80,7 @@ class StupidNode:
         self._wai_thread.start()
 
         self.route_queue = deque(list(), ROUTE_QUEUE_LEN)
+        self.routes = dict()
 
         self.log.debug("node setup complete")
 
@@ -128,7 +132,7 @@ class StupidNode:
 
     def preprocess_message(self, msg, msg_class=TaggedMessage):
         if not isinstance(msg, msg_class):
-            if not isinstance(msg, (list,tuple)):
+            if not isinstance(msg, (list, tuple)):
                 msg = (msg,)
             msg = msg_class(*msg, name=self.identity)
         rmsg = repr(msg)
@@ -138,30 +142,55 @@ class StupidNode:
     def route_failed(self, msg):
         if not isinstance(msg, RoutedMessage):
             raise TypeError("msg must already be a RoutedMessage")
-        self.route_queue.append(msg)
+        msg.failures += 1
+        if msg.failures <= 5:
+            self.log.debug("(re)queueing %s for later delivery", repr(msg))
+            if len(self.route_queue) == self.route_queue.maxlen:
+                self.log.error(
+                    "route_queue full, discarding %s", repr(self.route_queue[0])
+                )
+            self.route_queue.append(msg)
+        else:
+            self.log.error("discarding %s after %d failures", repr(msg), msg.failures)
 
     def route_message(self, to, msg):
+        if isinstance(to, (list, tuple)):
+            to = to[-1]
+        R = self.routes.get(to)
+        if R:
+            to = (R[0], to)
         if isinstance(msg, RoutedMessage):
             msg.to = to
-        elif isinstance(msg, (list,tuple)):
+        elif isinstance(msg, (list, tuple)):
             msg = (to,) + tuple(msg)
         else:
             msg = (to, msg)
         tmsg, rmsg, emsg = self.preprocess_message(msg, msg_class=RoutedMessage)
-        self.log.debug("routing message %s", rmsg)
+        self.log.debug("routing message %s -- encoding: %s", rmsg, emsg)
         try:
             self.router.send_multipart(emsg)
         except zmq.error.ZMQError as zmq_e:
-            self.log.error("route to %s failed: %s", to, zmq_e)
+            self.log.debug("route to %s failed: %s", to, zmq_e)
             if "Host unreachable" not in str(zmq_e):
                 raise
             self.route_failed(tmsg)
 
-    def publish_message(self, msg, no_deal=False, no_deal_to=None):
+    def deal_message(self, msg):
+        self.log.debug("dealing message (actually publishing with no_publish=True)")
+        self.publish_message(msg, no_publish=True)
+
+    def publish_message(self, msg, no_deal=False, no_deal_to=None, no_publish=False):
         tmsg, rmsg, emsg = self.preprocess_message(msg)
+        self.log.debug(
+            "publishing message %s no_publish=%s, no_deal=%s, no_deal_to=%s",
+            rmsg,
+            no_publish,
+            no_deal,
+            no_deal_to,
+        )
         self.local_workflow(tmsg)
-        self.log.debug("publishing message %s", rmsg)
-        self.pub.send_multipart(emsg)
+        if not no_publish:
+            self.pub.send_multipart(emsg)
         if no_deal:
             return
         if no_deal_to is None:
@@ -220,6 +249,7 @@ class StupidNode:
         return socket
 
     def local_workflow(self, msg):
+        self.log.debug("start local_workflow %s", repr(msg))
         msg = self.local_react(msg)
         if msg:
             msg = self.all_react(msg)
@@ -228,8 +258,10 @@ class StupidNode:
     def sub_workflow(self, socket):
         idx = self.sub.index(socket)
         enp = self.endpoints[idx]
-        self.log.debug("start sub_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.sub_receive(socket, idx)
+        self.log.debug(
+            "start sub_workflow (idx=%d -> endpoint=%s) %s", idx, enp, repr(msg)
+        )
         for react in (self.nonlocal_react, self.all_react):
             if msg:
                 msg = react(msg, idx=idx)
@@ -237,8 +269,8 @@ class StupidNode:
         return msg
 
     def router_workflow(self):
-        self.log.debug("start router_workflow")
         msg = self.router_receive()
+        self.log.debug("start router_workflow %s", repr(msg))
         for react in (self.nonlocal_react, self.all_react):
             if not msg:
                 break
@@ -249,9 +281,11 @@ class StupidNode:
     def dealer_workflow(self, socket):
         idx = self.dealer.index(socket)
         enp = self.endpoints[idx]
-        self.log.debug("start deal_workflow (idx=%d -> endpoint=%s)", idx, enp)
         msg = self.dealer_receive(socket, idx)
-        for react in (self.nonlocal_react, self.all_react):
+        self.log.debug(
+            "start deal_workflow (idx=%d -> endpoint=%s) %s", idx, enp, repr(msg)
+        )
+        for react in (self.routed_react, self.nonlocal_react, self.all_react):
             if not msg:
                 break
             msg = react(msg, idx=idx)
@@ -277,6 +311,9 @@ class StupidNode:
         return msg
 
     def local_react(self, msg):
+        return msg
+
+    def routed_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
     def poll(self, timeo=500, other_cb=None):
@@ -466,13 +503,15 @@ class RelayNode(StupidNode):
         old = time.time() - self.dup_time
         self.recent = set(x for x in self.recent if x.time > old)
 
-    def is_repeat(self, msg):
+    def is_repeat(self, tag, update_recent=False):
+        if not isinstance(tag, Tag):
+            tag = Tag(tag)
         self.cleanup_recent()
-        if msg.tag in self.recent:
-            self.log.debug("%r may be a repeat, not (re)broadcasting", msg)
+        if tag in self.recent:
+            self.log.debug("%r may be a repeat, not (re)broadcasting", tag)
             return True
-        self.log.debug("marking having seen %s, check_msg ok though", msg.tag)
-        self.recent.add(msg.tag)
+        if update_recent:
+            self.recent.add(tag)
         return False
 
     def local_react(self, msg):
@@ -480,15 +519,58 @@ class RelayNode(StupidNode):
         self.recent.add(msg.tag)
         return msg
 
+    def handle_broadcast(self, msg, idx=None):
+        if len(msg) == 3 and msg[1] == "where is" and msg[2] == self.identity:
+            self.deal_message((BROADCAST_PREFIX, "I am here"))
+        elif len(msg) == 2 and msg[1] == "I am here":
+            self.deal_message((BROADCAST_PREFIX, "I route", msg.name))
+            self.routes[msg.name] = tuple()
+            self.route_update()
+        elif len(msg) >= 3 and msg[1] == "I route":
+            route = (msg.name,) + tuple(msg[2:])
+            self.deal_message((BROADCAST_PREFIX, "I route") + route)
+            for i, item in enumerate(route):
+                self.routes[item] = route[:i]
+            self.route_update()
+        else:
+            self.publish_message(msg, no_deal_to=idx)
+        return False
+
     def nonlocal_react(self, msg, idx=None):
-        if self.is_repeat(msg):
+        if self.is_repeat(msg.tag, update_recent=True):
             return False
-        self.publish_message(msg, no_deal_to=idx)
-        if msg[0] == BROADCAST_PREFIX:
-            if msg[1] == "where is" and msg[2] == self.identity:
-                self.log.error("TODO HERE I AM TODO")
+        if msg[0] == BROADCAST_PREFIX and len(msg) > 1:
+            return self.handle_broadcast(msg, idx=idx)
+        if msg.publish_mark:
+            self.publish_message(msg, no_deal_to=idx)
+        return msg
+
+    def routed_react(self, msg, idx=None):
+        rm = RoutedMessage.decode(msg)
+        if rm:
+            self.log.info(
+                "received routed message %s intended for %s", repr(rm), rm.to[-1]
+            )
+            self.route_message(rm.to[-1], rm)
             return False
+        self.log.info("received routed message %s intended for me!", repr(msg))
+        msg.publish_mark = False
         return msg
 
     def route_failed(self, msg):
-        self.publish_message((BROADCAST_PREFIX, "where is", msg.to))
+        super().route_failed(msg)
+        self.publish_message((BROADCAST_PREFIX, "where is", msg.to[-1]))
+
+    def route_update(self):
+        self.log.debug("routes updated to %s", self.routes)
+        todo = list()
+        for msg in self.route_queue:
+            self.log.debug(
+                "is msg.to=%s in self.routes=%s now?", msg.to, list(self.routes)
+            )
+            if msg.to[-1] in self.routes:
+                todo.append(msg)
+        for msg in todo:
+            self.route_queue.remove(msg)
+            self.log.debug("retrying failed route message")
+            self.route_message(msg.to, msg)

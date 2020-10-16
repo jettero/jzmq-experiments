@@ -7,4 +7,3 @@ MSG(A:B,C,D,E)
 MSG(E:A,B,C,D)
 
 ROUTE(E:A)
-ROUTE(A:E)

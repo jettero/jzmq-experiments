@@ -44,10 +44,10 @@ class PollWrapper:
             node.received_messages = list()
         return self.do_poll
 
-    def do_poll(self):
+    def do_poll(self, min_loops=1):
         loops = 0
         did_something = True
-        while did_something:
+        while did_something or loops < min_loops:
             did_something = False
             for node in self.tarch:
                 res = [str(x) for x in node.poll(MSG_WAIT_MS)]
@@ -82,8 +82,8 @@ def test_publish_from_A(tarch, loop):
             assert node.received_messages == correct
 
 
-def _continue_tarch_test(tarch, tarch_names, test, do_poll):
-    log.info("polling ran for count=%d round(s)", do_poll())
+def _continue_tarch_test(tarch, tarch_names, test, do_poll, min_loops=1):
+    log.info("polling ran for count=%d round(s)", do_poll(min_loops=min_loops))
     log.info("we expect nodes=%s should have heard the message", test.rcpt)
     for name in tarch_names:
         if name in test.rcpt:
@@ -96,7 +96,7 @@ def _continue_tarch_test(tarch, tarch_names, test, do_poll):
 
 @pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"), reason="network disabled")
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-@pytest.mark.usefixtures('loop')
+@pytest.mark.usefixtures("loop")
 def test_tarch_published_msgs(tarch, tarch_names, tarch_tests):
     for test in tarch_tests:
         with PollWrapper(tarch) as do_poll:
@@ -108,7 +108,7 @@ def test_tarch_published_msgs(tarch, tarch_names, tarch_tests):
 
 @pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"), reason="network disabled")
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-@pytest.mark.usefixtures('loop')
+@pytest.mark.usefixtures("loop")
 def test_tarch_routed_msgs(tarch, tarch_names, tarch_tests):
     for test in tarch_tests:
         with PollWrapper(tarch) as do_poll:
@@ -117,4 +117,4 @@ def test_tarch_routed_msgs(tarch, tarch_names, tarch_tests):
                     'routing message "%s" from %s to %s', test.msg, test.src, test.dst
                 )
                 tarch[test.src].route_message(tarch[test.dst], test.msg)
-                _continue_tarch_test(tarch, tarch_names, test, do_poll)
+                _continue_tarch_test(tarch, tarch_names, test, do_poll, min_loops=10)

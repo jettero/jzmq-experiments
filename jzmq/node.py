@@ -267,7 +267,7 @@ class StupidNode:
         self.log.debug(
             "start sub_workflow (idx=%d -> endpoint=%s) %s", idx, enp, repr(msg)
         )
-        for react in (self.nonlocal_react, self.all_react):
+        for react in (self.sub_react, self.nonlocal_react, self.all_react):
             if msg:
                 msg = react(msg, idx=idx)
         self.log.debug("end sub_workflow")
@@ -276,7 +276,7 @@ class StupidNode:
     def router_workflow(self):
         msg = self.router_receive()
         self.log.debug("start router_workflow %s", repr(msg))
-        for react in (self.nonlocal_react, self.all_react):
+        for react in (self.router_react, self.nonlocal_react, self.all_react):
             if not msg:
                 break
             msg = react(msg)
@@ -290,7 +290,7 @@ class StupidNode:
         self.log.debug(
             "start deal_workflow (idx=%d -> endpoint=%s) %s", idx, enp, repr(msg)
         )
-        for react in (self.routed_react, self.nonlocal_react, self.all_react):
+        for react in (self.dealer_react, self.nonlocal_react, self.all_react):
             if not msg:
                 break
             msg = react(msg, idx=idx)
@@ -301,25 +301,48 @@ class StupidNode:
         return TaggedMessage(*socket.recv_multipart())
 
     def dealer_receive(self, socket, idx):  # pylint: disable=unused-argument
-        return TaggedMessage(*socket.recv_multipart())
+        msg = socket.recv_multipart()
+        rm = RoutedMessage.decode(msg)
+        if rm:
+            return rm
+        # dealer's always receive a routed message if it doesn't appear to be
+        # routed, then it's simply intended for us. In that case, build a
+        # tagged message and mark it as non-publish
+        msg = TaggedMessage(*msg)
+        msg.publish_mark = False
+        return msg
 
     def router_receive(self):
-        _, *msg = self.router.recv_multipart()
         # we ignore the source ID (in '_') and just believe the msg.tag.name ... it's
         # roughly the same thing anyway
+        _, *msg = self.router.recv_multipart()
+        rm = RoutedMessage.decode(msg)
+        if rm:
+            return rm
         return TaggedMessage(*msg)
 
     def all_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
+    def sub_react(self, msg, idx=None):  # pylint disable=unused-argument
+        return msg
+
+    def dealer_react(self, msg, idx=None):  # pylint disable=unused-argument
+        return msg
+
+    def router_react(self, msg):
+        return msg
+
     def nonlocal_react(self, msg, idx=None):  # pylint: disable=unused-argument
+        if isinstance(msg, RoutedMessage):
+            msg = self.routed_react(msg, idx=idx)
         return msg
 
     def local_react(self, msg):
         return msg
 
     def routed_react(self, msg, idx=None):  # pylint: disable=unused-argument
-        return msg
+        return False
 
     def poll(self, timeo=500, other_cb=None):
         """Check to see if there's any incoming messages. If anything seems ready to receive,
@@ -542,25 +565,22 @@ class RelayNode(StupidNode):
         return False
 
     def nonlocal_react(self, msg, idx=None):
-        if self.is_repeat(msg.tag, update_recent=True):
-            return False
-        if msg[0] == BROADCAST_PREFIX and len(msg) > 1:
-            return self.handle_broadcast(msg, idx=idx)
-        if msg.publish_mark:
-            self.publish_message(msg, no_deal_to=idx)
+        msg = super().nonlocal_react(msg, idx=idx)
+        if msg:
+            if self.is_repeat(msg.tag, update_recent=True):
+                return False
+            if msg[0] == BROADCAST_PREFIX and len(msg) > 1:
+                return self.handle_broadcast(msg, idx=idx)
+            if msg.publish_mark:
+                self.publish_message(msg, no_deal_to=idx)
         return msg
 
     def routed_react(self, msg, idx=None):
-        rm = RoutedMessage.decode(msg)
-        if rm:
-            self.log.info(
-                "received routed message %s intended for %s", repr(rm), rm.to[-1]
-            )
-            self.route_message(rm.to[-1], rm)
-            return False
-        self.log.info("received routed message %s intended for me!", repr(msg))
-        msg.publish_mark = False
-        return msg
+        self.log.info(
+            "received routed message %s intended for %s", repr(msg), msg.to[-1]
+        )
+        self.route_message(msg.to[-1], msg)
+        return False
 
     def route_failed(self, msg):
         super().route_failed(msg)

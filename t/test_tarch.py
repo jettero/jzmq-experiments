@@ -110,6 +110,11 @@ def test_tarch_published_msgs(tarch, tarch_names, tarch_tests):
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
 @pytest.mark.usefixtures("loop")
 def test_tarch_routed_msgs(tarch, tarch_names, tarch_tests):
+    # In the worst routed case (nodes on a stick), we have to tell each node to
+    # poll() at least 2(n-1) times without expecting any message to come back:
+    # we have to wait for a route and then resend the message
+    min_loops = (len(tarch) - 1) * 2
+
     for test in tarch_tests:
         with PollWrapper(tarch) as do_poll:
             if test.mtype == "R":
@@ -117,4 +122,6 @@ def test_tarch_routed_msgs(tarch, tarch_names, tarch_tests):
                     'routing message "%s" from %s to %s', test.msg, test.src, test.dst
                 )
                 tarch[test.src].route_message(tarch[test.dst], test.msg)
-                _continue_tarch_test(tarch, tarch_names, test, do_poll, min_loops=10)
+                _continue_tarch_test(
+                    tarch, tarch_names, test, do_poll, min_loops=min_loops
+                )

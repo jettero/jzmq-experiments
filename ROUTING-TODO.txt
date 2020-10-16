@@ -1,0 +1,18 @@
+[x] prevent routing loops — I think we got this
+[ ] routed messages should queue at the src until the destination receives
+    them or the sender gets tired of waiting. currently, if we can find no
+    route, we eventually discards (which is ok); but if we have a route
+    that doesn't work — we send the message and expect the next hop to
+    handle the queueing. The only way to queue locally and discard there is
+    if the next hop happens to be the destination and it's not actually
+    there.
+[ ] we need some kind of reverse routing … in a network on a stick,
+    a>b>c>d>e we can route from e>>a but routes from a>>e will always fail
+    because we don't ever attempt to route messages back up the dealer
+    socket. Some of the framework is already there though. nonlocal_react
+    invokes routed_react when it receives a routed message. This is meant
+    to facilitate sending the message up the dealer hole.
+[ ] we need some way to invalidate routes
+[ ] we need a routing table so we can try alternate routes of we learn one
+    doesn't work (see invalidate above). With this, we could also order
+    known routes in shortest first fashion.

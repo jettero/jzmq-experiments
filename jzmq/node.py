@@ -324,16 +324,16 @@ class StupidNode:
     def all_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
-    def sub_react(self, msg, idx=None):  # pylint disable=unused-argument
+    def sub_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
-    def dealer_react(self, msg, idx=None):  # pylint disable=unused-argument
+    def dealer_react(self, msg, idx=None):  # pylint: disable=unused-argument
         return msg
 
     def router_react(self, msg):
         return msg
 
-    def nonlocal_react(self, msg, idx=None):  # pylint: disable=unused-argument
+    def nonlocal_react(self, msg, idx=None):
         if isinstance(msg, RoutedMessage):
             msg = self.routed_react(msg, idx=idx)
         return msg
@@ -555,7 +555,11 @@ class RelayNode(StupidNode):
             self.routes[msg.name] = tuple()
             self.route_update()
         elif len(msg) >= 3 and msg[1] == "I route":
-            route = (msg.name,) + tuple(msg[2:])
+            route_portion = tuple(msg[2:])
+            if self.identity in route_portion or msg.name in route_portion:
+                self.log.info('this route came back around apparently: %s', msg)
+                return False
+            route = (msg.name,) + route_portion
             self.deal_message((BROADCAST_PREFIX, "I route") + route)
             for i, item in enumerate(route):
                 self.routes[item] = route[:i]

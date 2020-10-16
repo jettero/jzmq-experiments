@@ -10,21 +10,43 @@ from jzmq.util import get_ports, increment_ports, DEFAULT_PORTS
 log = logging.getLogger(__name__)
 ports = DEFAULT_PORTS
 
+Ndesc = namedtuple("Ndesc", ("ident", "laddr", "raddr", "endpoints"))
+
+class Tdesc(namedtuple("Tdesc", ("mtype", "tag", "src", "rcpt"))):
+    @property
+    def msg(self):
+        return self.tag
+
+    @property
+    def dst(self):
+        if self.mtype != 'R':
+            raise TypeError("not a route")
+        if len(self.rcpt) != 1:
+            raise ValueError('routes must have exactly one destination')
+        return self.rcpt[0]
+
 
 def read_tarch_description(file="NOTES.txt"):
     global ports
-    Ndesc = namedtuple("Ndesc", ("ident", "laddr", "raddr", "endpoints"))
-    Tdesc = namedtuple("Tdesc", ("msg", "source", "recipients"))
+
     node_map = dict()
     test_list = list()
     node_connection_re = re.compile(r"\b(?P<lhs>[A-Z])\s*→\s*(?P<rhs>[A-Z])\b")
     test_description_re = re.compile(
-        r"MSG(?:<(?P<msg_tag>[^<>]*?)>)?\((?P<source>[^:]+?):(?P<recipients>.+?)\)"
+        r"(?P<mtype>MSG|ROUTE)(?:<(?P<tag>[^<>]*?)>)?"
+        r"\((?P<src>\w+?)"
+        r":(?P<rcpt>[\w,]+?)\)"
     )
     rsplit_re = re.compile(r"\s*,\s*")
+    all_test = False
+    lineno = 0
     with open(file, "r") as fh:
         for line in fh:
-            if "TEST_ARCH" in line:
+            lineno += 1
+            if lineno == 1 and line.startswith("#!test-arch"):
+                all_test = True
+                continue
+            if all_test or "TEST_ARCH" in line:
                 for lhs, rhs in node_connection_re.findall(line):
                     for _hs in (lhs, rhs):
                         if _hs not in node_map:
@@ -37,11 +59,16 @@ def read_tarch_description(file="NOTES.txt"):
                                 list(),
                             )
                     node_map[lhs].endpoints.append(rhs)
-                for msg, source, recipients in test_description_re.findall(line):
-                    if not msg:
-                        msg = "message"
-                    recipients = rsplit_re.split(recipients)
-                    test_list.append(Tdesc(msg, source, recipients))
+                for mtype, tag, src, rcpt in test_description_re.findall(line):
+                    if not tag:
+                        tag = "message"
+                    rcpt = rsplit_re.split(rcpt)
+                    mtype = mtype[0]
+                    test_list.append(Tdesc(mtype[0], tag, src, rcpt))
+    for node in node_map.values():
+        log.debug('[read desc] found node %s with endpoints %s', node.ident.split(':')[0], node.endpoints)
+    for test in test_list:
+        log.debug('[read desc] found test %s', test)
     return node_map, test_list
 
 

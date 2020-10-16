@@ -5,7 +5,6 @@ import os
 import time
 import logging
 from glob import glob
-from collections import namedtuple
 import pytest
 import zmq
 import jzmq
@@ -19,10 +18,11 @@ def always_true():
     return True
 
 
+# NOTE: it's tempting to try to use @pytest.mark.parametrize here, but
+# that doesn't work on fixtures... it only generates fixtures for test functions
 @pytest.fixture(scope="session", params=["NOTES.txt"] + glob("t/resource/tarch/*.txt"))
 def tarch_desc(request):
-    TarchDesc = namedtuple("TarchDesc", ("arch", "tests"))
-    yield TarchDesc(*t.arch.read_tarch_description(file=request.param))
+    yield t.arch.read_tarch_description(file=request.param)
 
 
 @pytest.fixture(scope="session")
@@ -36,11 +36,9 @@ def tarch_tests(tarch_desc):
 
 
 @pytest.fixture(scope="function")
-def tarch(tarch_desc, tarch_names):
-    Nodes = namedtuple("Nodes", tarch_names)
-
+def tarch(tarch_desc):
     log.info("created tarch nodes")
-    nodes = Nodes(*t.arch.generate_nodes(tarch_desc.arch))
+    nodes = t.arch.generate_nodes(tarch_desc.arch)
     time.sleep(0.1)  # give everything an moment to connect
 
     yield nodes

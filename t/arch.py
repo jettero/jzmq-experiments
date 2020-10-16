@@ -10,7 +10,9 @@ from jzmq.util import get_ports, increment_ports, DEFAULT_PORTS
 log = logging.getLogger(__name__)
 ports = DEFAULT_PORTS
 
+TarchDesc = namedtuple("TarchDesc", ("arch", "tests"))
 Ndesc = namedtuple("Ndesc", ("ident", "laddr", "raddr", "endpoints"))
+
 
 class Tdesc(namedtuple("Tdesc", ("mtype", "tag", "src", "rcpt"))):
     @property
@@ -19,10 +21,10 @@ class Tdesc(namedtuple("Tdesc", ("mtype", "tag", "src", "rcpt"))):
 
     @property
     def dst(self):
-        if self.mtype != 'R':
+        if self.mtype != "R":
             raise TypeError("not a route")
         if len(self.rcpt) != 1:
-            raise ValueError('routes must have exactly one destination')
+            raise ValueError("routes must have exactly one destination")
         return self.rcpt[0]
 
 
@@ -66,10 +68,15 @@ def read_tarch_description(file="NOTES.txt"):
                     mtype = mtype[0]
                     test_list.append(Tdesc(mtype[0], tag, src, rcpt))
     for node in node_map.values():
-        log.debug('[read desc] found node %s with endpoints %s', node.ident.split(':')[0], node.endpoints)
+        log.debug(
+            "[read desc] found node %s with endpoints %s",
+            node.ident.split(":")[0],
+            node.endpoints,
+        )
     for test in test_list:
-        log.debug('[read desc] found test %s', test)
-    return node_map, test_list
+        log.debug("[read desc] found test %s", test)
+
+    return TarchDesc(node_map, test_list)
 
 
 def generate_nodes(tarch_desc):
@@ -89,9 +96,10 @@ def generate_nodes(tarch_desc):
         log.info("connecting %s to endpoints=%s", node, raddrs)
         node.connect_to_endpoints(*raddrs)
 
-    return [x for x, _ in tmp]
+    class Tarch(namedtuple("Tarch", tuple(tarch_desc))):
+        def __getitem__(self, idx):
+            if isinstance(idx, str):
+                return getattr(self, idx)
+            return super().__getitem__(idx)
 
-
-def get_tarch(file="NOTES.txt"):
-    tarch_desc, test_desc = read_tarch_description(file=file)
-    return generate_nodes(tarch_desc), test_desc
+    return Tarch(*(x for x, _ in tmp))

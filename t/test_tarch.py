@@ -26,8 +26,13 @@ def test_tarch_construction(tarch, tarch_names):
         assert isinstance(node, Node)
 
     assert len(tarch_names) == len(tarch)
-    for k, node in zip(tarch_names, tarch):
-        assert node is getattr(tarch, k)
+    for i, (k, node) in enumerate(zip(tarch_names, tarch)):
+        assert isinstance(i, int)
+        assert isinstance(k, str)
+        assert isinstance(node, Node)
+        assert node is tarch[k]
+        assert node is tarch[i]
+        assert getattr(tarch, k) is tarch[k]
 
 
 class PollWrapper:
@@ -77,28 +82,39 @@ def test_publish_from_A(tarch, loop):
             assert node.received_messages == correct
 
 
+def _continue_tarch_test(tarch, tarch_names, test, do_poll):
+    log.info("polling ran for count=%d round(s)", do_poll())
+    log.info("we expect nodes=%s should have heard the message", test.rcpt)
+    for name in tarch_names:
+        if name in test.rcpt:
+            log.info("%s should have heard the message", name)
+            assert tarch[name].received_messages == [test.msg]
+        else:
+            log.info("%s should not have heard the message", name)
+            assert tarch[name].received_messages == list()
+
+
 @pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"), reason="network disabled")
 @pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
-def test_tarch_msg_tests(tarch, tarch_names, tarch_tests, loop):
+@pytest.mark.usefixtures('loop')
+def test_tarch_published_msgs(tarch, tarch_names, tarch_tests):
     for test in tarch_tests:
         with PollWrapper(tarch) as do_poll:
-            log.info(
-                "begin(%s) %s.publish_message(%s) ==> %s",
-                loop,
-                test.source,
-                test.msg,
-                test.recipients,
-            )
-            getattr(tarch, test.source).publish_message(test.msg)
+            if test.mtype == "M":
+                log.info('publishing message "%s" from %s', test.msg, test.src)
+                tarch[test.src].publish_message(test.msg)
+                _continue_tarch_test(tarch, tarch_names, test, do_poll)
 
-            log.info("polling ran for count=%d round(s)", do_poll())
-            log.info(
-                "we expect nodes=%s should have heard the message", test.recipients
-            )
-            for name in tarch_names:
-                if name in test.recipients:
-                    log.info("%s should have heard the message", name)
-                    assert getattr(tarch, name).received_messages == [test.msg]
-                else:
-                    log.info("%s should not have heard the message", name)
-                    assert getattr(tarch, name).received_messages == list()
+
+@pytest.mark.skipif(os.environ.get("JZMQ_SKIP_NETWORK"), reason="network disabled")
+@pytest.mark.parametrize("loop", range(TEST_REPETITIONS))
+@pytest.mark.usefixtures('loop')
+def test_tarch_routed_msgs(tarch, tarch_names, tarch_tests):
+    for test in tarch_tests:
+        with PollWrapper(tarch) as do_poll:
+            if test.mtype == "R":
+                log.info(
+                    'routing message "%s" from %s to %s', test.msg, test.src, test.dst
+                )
+                tarch[test.src].route_message(tarch[test.dst], test.msg)
+                _continue_tarch_test(tarch, tarch_names, test, do_poll)

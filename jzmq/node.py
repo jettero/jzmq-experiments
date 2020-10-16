@@ -154,6 +154,8 @@ class StupidNode:
             self.log.error("discarding %s after %d failures", repr(msg), msg.failures)
 
     def route_message(self, to, msg):
+        if isinstance(to, StupidNode):
+            to = to.identity
         if isinstance(to, (list, tuple)):
             to = to[-1]
         R = self.routes.get(to)
@@ -161,10 +163,13 @@ class StupidNode:
             to = (R[0], to)
         if isinstance(msg, RoutedMessage):
             msg.to = to
-        elif isinstance(msg, (list, tuple)):
-            msg = (to,) + tuple(msg)
         else:
-            msg = (to, msg)
+            # preprocess passes *msg to msg_class() -- ie, RoutedMessage(to, *msg)
+            if isinstance(msg, list):
+                msg = tuple(msg)
+            elif not isinstance(msg, tuple):
+                msg = (msg,)
+            msg = (to,) + msg
         tmsg, rmsg, emsg = self.preprocess_message(msg, msg_class=RoutedMessage)
         self.log.debug("routing message %s -- encoding: %s", rmsg, emsg)
         try:

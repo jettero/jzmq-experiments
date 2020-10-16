@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+source ~/.jbash/options-processing
+
+if [ -z "$PRE_COMMIT_FROM_REF" ]
+then PRE_COMMIT_FROM_REF="$(git remote | head -n 1)"/master
+fi
+
+if [ -z "$PRE_COMMIT_TO_REF" ]
+then PRE_COMMIT_TO_REF=HEAD
+fi
+
+function mylog {
+    git log --format=%s "$PRE_COMMIT_FROM_REF".."$PRE_COMMIT_TO_REF"
+}
+
+if SQUISH="$( mylog | grep '^[_-]' )"; then
+    echo; echo "squished commits detected:"
+    echo "$SQUISH" | sed -e 's/^/  /'
+    echo
+    exit 1
+fi
+
+exit 0

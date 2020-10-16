@@ -25,21 +25,18 @@ repos:
   hooks:
   - id: pylint
     name: pylint
-    entry: ./pathed-pylintest pylint
+    entry: ./.pathed-pylintest pylint
     language: system
     types: [python]
   - id: pytest
     name: pytest
-    entry: ./pathed-pylintest pytest --log-cli-level info t --log-disable zmq.auth
+    entry: ./.pathed-pylintest pytest --log-cli-level info t --log-disable zmq.auth
     always_run: true
     language: system
     pass_filenames: false
-
-# this doesn't seem to quite work...
-# - repo: local
-#   hooks:
-#     - id: tests
-#       name: run tests
-#       entry: pytest
-#       language: system
-#       types: [python]
+  - id: no-squish
+    name: no-squish
+    language: system
+    always_run: true
+    pass_filenames: false
+    entry: ./.no-squish

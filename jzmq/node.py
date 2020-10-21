@@ -427,7 +427,7 @@ class StupidNode:
     def who_are_you_request(self, endpoint):
         req = self.mk_socket(zmq.REQ, enable_curve=False)
         req.connect(endpoint.format(zmq.REQ))
-        msg = b'Who are you?'
+        msg = b"Who are you?"
         self.log.debug("sending cleartext request: %s", msg)
         req.send(msg)
         self.log.debug("waiting for reply")
@@ -556,7 +556,7 @@ class RelayNode(StupidNode):
         elif len(msg) >= 3 and msg[1] == "I route":
             route_portion = tuple(msg[2:])
             if self.identity in route_portion or msg.name in route_portion:
-                self.log.info('this route came back around apparently: %s', msg)
+                self.log.info("this route came back around apparently: %s", msg)
                 return False
             route = (msg.name,) + route_portion
             self.deal_message((BROADCAST_PREFIX, "I route") + route)

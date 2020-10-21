@@ -75,17 +75,17 @@ class StupidNode:
         signal.signal(signal.SIGINT, self.interrupt)
 
         self.log.debug("configuring WAI Reply Thread")
-        self._wai_thread = Thread(target=self.wai_reply_machine)
-        self._wai_continue = True
-        self._wai_thread.start()
+        self._who_are_you_thread = Thread(target=self.who_are_you_reply_machine)
+        self._who_are_you_continue = True
+        self._who_are_you_thread.start()
 
         self.route_queue = deque(list(), ROUTE_QUEUE_LEN)
         self.routes = dict()
 
         self.log.debug("node setup complete")
 
-    def wai_reply_machine(self):
-        while self._wai_continue:
+    def who_are_you_reply_machine(self):
+        while self._who_are_you_continue:
             if self.rep.poll(200):
                 self.log.debug("wai polled, trying to recv")
                 msg = self.rep.recv()
@@ -393,13 +393,13 @@ class StupidNode:
                 self.log.debug("auth thread seems to have stopped")
             del self.auth
 
-        if hasattr(self, "_wai_thread"):
-            if self._wai_thread.is_alive():
+        if hasattr(self, "_who_are_you_thread"):
+            if self._who_are_you_thread.is_alive():
                 self.log.debug("WAI Thread seems to be alive, trying to join")
-                self._wai_continue = False
-                self._wai_thread.join()
+                self._who_are_you_continue = False
+                self._who_are_you_thread.join()
                 self.log.debug("WAI Thread seems to jave joined us.")
-            del self._wai_thread
+            del self._who_are_you_thread
 
         if hasattr(self, "cleartext_ctx"):
             self.log.debug("destroying cleartext context")
@@ -424,11 +424,10 @@ class StupidNode:
         except zmq.ZMQError as e:
             raise zmq.ZMQError(f"unable to bind {f}: {e}") from e
 
-    def cleartext_request(self, endpoint, msg):
+    def who_are_you_request(self, endpoint):
         req = self.mk_socket(zmq.REQ, enable_curve=False)
         req.connect(endpoint.format(zmq.REQ))
-        if not isinstance(msg, (bytes, bytearray)):
-            msg = msg.encode()
+        msg = b'Who are you?'
         self.log.debug("sending cleartext request: %s", msg)
         req.send(msg)
         self.log.debug("waiting for reply")
@@ -452,7 +451,7 @@ class StupidNode:
             self.log.debug(
                 "%s does not exist yet, trying to learn certificate", epubk_pname
             )
-            node_id, public_key = self.cleartext_request(endpoint, "who are you?")
+            node_id, public_key = self.who_are_you_request(endpoint)
             if node_id:
                 endpoint.identity = node_id.decode()
                 epubk_pname = self.pubkey_pathname(node_id)
